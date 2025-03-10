@@ -1,4 +1,6 @@
 import re
+from nodos import *
+import json
 
 # === Analisis Lexico ===
 # Definir los patrones para los diferentes tipos de tokens
@@ -6,7 +8,7 @@ token_patron = {
     "KEYWORD": r'\b(if|else|while|switch|case|return|print|break|for|int|float|void|double|char)\b',
     "IDENTIFIER": r'\b[a-zA-Z_][a-zA-Z0-9_]*\b',
     "NUMBER": r'\b\d+(\.\d+)?\b',
-    "OPERATOR": r'[\+\-\*\/\=\<\>\!/\_]',
+    "OPERATOR": r'[\+\-\*\/\=\<\>\!\_]',
     "DELIMITER": r'[(),;{}]',
     "WHITESPACE": r'\s+',
     "STRING": r'"[^"]*"',  
@@ -42,27 +44,30 @@ class Parser:
 
     def parsear(self):
         # Punto de entrada del analizador sintactico: se espera una funcion
-        self.funcion()
+        return self.funcion()
 
     def funcion(self):
-        # Gramatica para una funcion: int  IDENTIFIER (int IDENTIFIER) {cuerpo}
-        self.coincidir('KEYWORD')  # Tipo de retorno (ej. int)
-        self.coincidir('IDENTIFIER')  # Nombre de la funcion
-        self.coincidir('DELIMITER')  # se espera un (
-        self.parametros()
-        self.coincidir('DELIMITER')  # se espera un )
-        self.coincidir('DELIMITER')# se espera un {
-        self.cuerpo()
-        self.coincidir('DELIMITER')
+        # Gramatica para una funcion: KEYWORD IDENTIFIER ( PARAMETROS ) { CUERPO }
+        tipo_retorno = self.coincidir('KEYWORD')  # Tipo de retorno (ej. int)
+        nombre_funcion = self.coincidir('IDENTIFIER')  # Nombre de la funcion
+        self.coincidir('DELIMITER')  # Se espera un '('
+        parametros = self.parametros()  # Analizar los parámetros
+        self.coincidir('DELIMITER')  # Se espera un ')'
+        self.coincidir('DELIMITER')  # Se espera un '{'
+        cuerpo = self.cuerpo()  # Analizar el cuerpo de la función
+        self.coincidir('DELIMITER')  # Se espera un '}'
+        return NodoFuncion(nombre_funcion[1], parametros, cuerpo)
 
     def parametros(self):
-        # Reglas para parametros: int IDENTIFIER (, int IDENTIFIER)*
-        self.coincidir('KEYWORD')  # Tipo del parametro
-        self.coincidir('IDENTIFIER')  # Nombre del parametro
-        while self.obtener_token_actual() and self.obtener_token_actual()[1] == ',':
-            self.coincidir('DELIMITER')  # se espera una ,
-            self.coincidir('KEYWORD')  # tipo del parametro
-            self.coincidir('IDENTIFIER')  # nombre del parametro
+        parametros = []
+        # Reglas para parametros: KEYWORD IDENTIFIER (, KEYWORD IDENTIFIER)*
+        while self.obtener_token_actual() and self.obtener_token_actual()[1] != ')':  # Mientras no se cierre el paréntesis
+            tipo = self.coincidir('KEYWORD')  # Tipo del parametro (ej. int)
+            nombre = self.coincidir('IDENTIFIER')  # Nombre del parametro (ej. a)
+            parametros.append(NodoParametro(tipo[1], nombre[1]))  # Guardar el tipo y nombre
+            if self.obtener_token_actual() and self.obtener_token_actual()[1] == ',':
+                self.coincidir('DELIMITER')  # Consumir la coma
+        return parametros
 
     def declaracion(self):
         # Regla para declaracion: KEYWORD IDENTIFIER '=' EXPRESION DELIMITER
@@ -76,7 +81,23 @@ class Parser:
 
         self.coincidir('DELIMITER')  # Se espera un ';'
 
+    def asignacion(self):
+        # Gramatica para el cuerpo: return IDENTIFIER OPERATOR IDENTIFIER;
+        tipo = self.coincidir('KEYWORD') # tipo
+        nombre = self.coincidir('IDENTIFIER') # Identificador <nombre de la variable>
+        self.coincidir('OPERATOR') # Operador ej. =
+        expresion = self.expresion_ing()
+        self.coincidir('DELIMITER') # ;
+        return NodoAsignacion(nombre, expresion)
+
+    def retorno(self):
+        self.coincidir('KEYWORD') # return
+        expresion = self.expresion_ing()
+        self.coincidir('DELIMITER') # ;
+        return NodoRetorno(expresion)
+
     def cuerpo(self):
+        instrucciones = []
         while self.obtener_token_actual() and self.obtener_token_actual()[1] != '}':
             token_actual = self.obtener_token_actual()
 
@@ -86,32 +107,51 @@ class Parser:
                 elif token_actual[1] == 'print':
                     self.printf_llamada()  # Procesar print
                 elif token_actual[1] == 'for':
-                    self.bucle_for() # Procesar for
+                    self.bucle_for()  # Procesar for
                 elif token_actual[1] == 'break':
-                    self.break_statement() # Procesar break
+                    self.break_statement()  # Procesar break
                 elif token_actual[1] == 'while':
-                    self.bucle_while() # Procesar while
+                    self.bucle_while()  # Procesar while
                 elif token_actual[1] == 'return':
-                    self.return_statement()
+                    instrucciones.append(self.retorno())  # Procesar return
                 else:
-                    self.declaracion()  # Procesar declaraciones 
+                    instrucciones.append(self.asignacion())  # Procesar declaraciones
 
             elif token_actual[0] == 'IDENTIFIER':
                 siguiente_token = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
                 if siguiente_token and siguiente_token[1] == '=':
-                    self.coincidir('IDENTIFIER')
-                    self.coincidir('OPERATOR')
-                    self.expresion()
-                    self.coincidir('DELIMITER')
+                    instrucciones.append(self.asignacion())  # Procesar asignación
                 elif siguiente_token and siguiente_token[1] in ['+', '-', '*', '/']:
-                    self.operador_abreviado()
+                    self.operador_abreviado()  # Procesar operadores abreviados
                 else:
-                    self.coincidir('IDENTIFIER')
-                    self.coincidir('DELIMITER')
+                    raise SyntaxError(f'Error sintactico: se esperaba una declaracion valida, pero se encontro: {token_actual}')
 
             else:
                 raise SyntaxError(f'Error sintactico: se esperaba una declaracion valida, pero se encontro: {token_actual}')
 
+        # Consumir el token '}' al final del cuerpo
+        #if self.obtener_token_actual() and self.obtener_token_actual()[1] == '}':
+        #    self.coincidir('DELIMITER')
+
+        return instrucciones
+
+    def expresion_ing(self):
+        izquierda = self.termino()  # Obtener el primer término (número o identificador)
+        while self.obtener_token_actual() and self.obtener_token_actual()[0] == 'OPERATOR':
+            operador = self.coincidir('OPERATOR')  # Consumir el operador
+            derecha = self.termino()  # Obtener el siguiente término
+            izquierda = NodoOperacion(izquierda, operador[1], derecha)  # Crear nodo de operación
+        return izquierda
+    
+    def termino(self):
+        token = self.obtener_token_actual()
+        if token[0] == 'NUMBER':
+            return NodoNumero(self.coincidir('NUMBER'))
+        elif token[0] == 'IDENTIFIER':
+            return NodoIdentificador(self.coincidir('IDENTIFIER'))
+        else:
+            raise SyntaxError(f'Error sintactico: Expresion no valida {token}')
+            
     def expresion(self):
         """
         Analiza expresiones matematicas o de concatenacion, por ejemplo:
@@ -276,57 +316,11 @@ class Parser:
 
 # === Ejemplo de Uso ===
 codigo_fuente = """
-int main(int x, int y, int z, int w) {
-    int i = 0 + 1;
-    while (i >= 5) {
-        i++;
-        print("Iteracion while: ", i);
-        while (i >= 5) {
-            i++;
-            print("Iteracion while: ", i);
-            for (int j = 0; j < 5; j++) {
-                print("Iteracion for: ", j);  
-                print(i);
-            for (int j = 0; j < 5; j++) print(i);
-            }
-        }
-    }
-    
-    return i + 1;
+int suma(int a, int b) {
+    int c = a + b;
+    return c;
 }
 """
-
-# int suma(int a, int b) {
-#         int c = a + b;
-#         return c;
-#     } 
-
-# int suma(int a, int b) {
-#       int c;
-#       return c = a + b;
-#  }
-
-# int main(int x, int y) {
-#     int x = 10;
-#     int y = 20;
-#     int resultado = x + y;
-
-#     if (resultado > 25) {
-#         printf("El resultado es mayor que 25");
-#     } else {
-#         printf("El resultado es menor o igual a 25");
-#     }
-
-#     int i = 0;
-#     while (i < 5) {
-#         printf("Iteracion while: ", i);
-#         i++;
-#     }
-
-#     for (int j = 0; j < 5; j++) {
-#          printf("Iteracion for: ", j);  
-#     }
-#     return;
 
 # Analisis lexico
 tokens = identificar_tokens(codigo_fuente)
@@ -334,12 +328,53 @@ print("Tokens encontrados:")
 for tipo, valor in tokens:
     print(f'{tipo}: {valor}')
 
-# Analisis sintactico
+# Analisis Sintactico
 try:
     print('\nIniciando analisis sintactico...')
     parser = Parser(tokens)
-    parser.parsear()
+    arbol_ast = parser.parsear()
     print('Analisis sintactico completado sin errores')
 
 except SyntaxError as e:
     print(e)
+    
+def imprimir_ast(nodo):
+    if isinstance(nodo, NodoFuncion):
+        return {
+            'Funcion': nodo.nombre,
+            'Parametros': [imprimir_ast(p) for p in nodo.parametros],
+            'Cuerpo': [imprimir_ast(c) for c in nodo.cuerpo]
+        }
+    elif isinstance(nodo, NodoParametro):
+        return {
+            'Parametro': nodo.nombre,
+            'Tipo': nodo.tipo
+        }
+    elif isinstance(nodo, NodoAsignacion):
+        return {
+            'Asignacion': nodo.nombre,
+            'Expresion': imprimir_ast(nodo.expresion)
+        }
+    elif isinstance(nodo, NodoOperacion):
+        return {
+            'Operacion': nodo.operador,
+            'Izquierda': imprimir_ast(nodo.izquierda),
+            'Derecha': imprimir_ast(nodo.derecha)
+        }
+    elif isinstance(nodo, NodoRetorno):
+        return {
+            'Retorno': imprimir_ast(nodo.expresion)
+        }
+    elif isinstance(nodo, NodoIdentificador):
+        return {
+            'Identificador': nodo.nombre
+        }
+    elif isinstance(nodo, NodoNumero):
+        return {
+            'Numero': nodo.valor
+        }
+    return {}
+
+parser = Parser(tokens)
+arbol_ast = parser.parsear()    
+print(json.dumps(imprimir_ast(arbol_ast), indent=1))
