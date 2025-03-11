@@ -42,3 +42,17 @@ class NodoNumero(NodoAST):
     # Nodo que representa un numero
     def __init__(self, valor):
         self.valor = valor
+        
+class NodoLlamadaFuncion(NodoAST):
+    # Nodo que representa una llamada a funcion
+    def __init__(self, nombre, argumentos):
+        self.nombre = nombre
+        self.argumentos = argumentos
+        
+class NodoPrograma(NodoAST):
+    """
+    Nodo que representa un programa completo.
+    Contiene una lista de funciones.
+    """
+    def __init__(self, funciones):
+        self.funciones = funciones
