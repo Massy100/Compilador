@@ -107,16 +107,19 @@ class Parser:
         return parametros
 
     def declaracion(self):
-        # Regla para declaracion: KEYWORD IDENTIFIER '=' EXPRESION DELIMITER
-        self.coincidir('KEYWORD') 
-        self.coincidir('IDENTIFIER')  
+        tipo = self.coincidir('KEYWORD')  # Tipo de dato (ej. 'int')
+        nombre = self.coincidir('IDENTIFIER')  # Nombre de la variable (ej. 'c')
 
-        token_actual = self.obtener_token_actual()
-        if token_actual and token_actual[1] == '=':  # Si es una asignacion
-            self.coincidir('OPERATOR')  # Se espera un =
-            self.expresion()  # El resto de la declaracion aritmetica
+        # Manejar asignación opcional (ej. '= a + b')
+        if self.obtener_token_actual() and self.obtener_token_actual()[1] == '=':
+            self.coincidir('OPERATOR')  # Consumir '='
+            expresion = self.expresion_ing()  # Analizar la expresión (ej. 'a + b')
+            nodo = NodoAsignacion(nombre, expresion)
+        else:
+            nodo = NodoDeclaracion(tipo[1], nombre[1])
 
-        self.coincidir('DELIMITER')  # Se espera un ';'
+        self.coincidir('DELIMITER')  # Consumir ';'
+        return nodo
 
     def asignacion(self):
         # Gramatica para el cuerpo: return IDENTIFIER OPERATOR IDENTIFIER;
@@ -134,36 +137,36 @@ class Parser:
         return NodoRetorno(expresion)
 
     def cuerpo(self):
-        instrucciones = []
+        instrucciones = []  
         while self.obtener_token_actual() and self.obtener_token_actual()[1] != '}':
             token_actual = self.obtener_token_actual()
 
+            if token_actual[0] == 'DELIMITER' and token_actual[1] == ';':
+                self.coincidir('DELIMITER')
+                continue
+
             if token_actual[0] == 'KEYWORD':
                 if token_actual[1] == 'if':
-                    instrucciones.append(self.bucle_if())  # Procesar if-else
+                    instrucciones.append(self.bucle_if())
                 elif token_actual[1] == 'print':
-                    instrucciones.append(self.printf_llamada())  # Procesar print
-                elif token_actual[1] == 'for':
-                    instrucciones.append(self.bucle_for())  # Procesar for
-                elif token_actual[1] == 'break':
-                    instrucciones.append(self.break_statement())  # Procesar break
-                elif token_actual[1] == 'while':
-                    instrucciones.append(self.bucle_while())  # Procesar while
+                    instrucciones.append(self.printf_llamada())
                 elif token_actual[1] == 'return':
-                    instrucciones.append(self.retorno())  # Procesar return
+                    instrucciones.append(self.retorno())
+                elif token_actual[1] in ['int', 'float', 'void', 'double', 'char']:
+                    instrucciones.append(self.declaracion())
                 else:
-                    instrucciones.append(self.asignacion())  # Procesar declaraciones
+                    raise SyntaxError(f'Error sintactico: Keyword no reconocido: {token_actual}')
 
             elif token_actual[0] == 'IDENTIFIER':
                 siguiente_token = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
-                if siguiente_token and siguiente_token[1] == '(':  # Es una llamada a funcion
-                    instrucciones.append(self.llamada_funcion())  # Procesar llamada a funcion
-                elif siguiente_token and siguiente_token[1] == '=':
-                    instrucciones.append(self.asignacion())  # Procesar asignacion
-                elif siguiente_token and siguiente_token[1] in ['+', '-', '*', '/']:
-                    instrucciones.append(self.operador_abreviado())  # Procesar operadores abreviados
+                if siguiente_token and siguiente_token[1] == '(':
+                    instrucciones.append(self.llamada_funcion())
                 else:
-                    raise SyntaxError(f'Error sintactico: se esperaba una declaracion valida, pero se encontro: {token_actual}')
+                    instrucciones.append(self.asignacion())
+
+            elif token_actual[0] in ['NUMBER', 'STRING']:
+                instrucciones.append(self.expresion_ing())
+                self.coincidir('DELIMITER')
 
             else:
                 raise SyntaxError(f'Error sintactico: se esperaba una declaracion valida, pero se encontro: {token_actual}')
@@ -171,21 +174,23 @@ class Parser:
         return instrucciones
 
     def expresion_ing(self):
-        izquierda = self.termino()  # Obtener el primer término (número o identificador)
+        izquierda = self.termino()  # Obtener el primer término
         while self.obtener_token_actual() and self.obtener_token_actual()[0] == 'OPERATOR':
-            operador = self.coincidir('OPERATOR')  # Consumir el operador
-            derecha = self.termino()  # Obtener el siguiente término
-            izquierda = NodoOperacion(izquierda, operador[1], derecha)  # Crear nodo de operación
+            operador = self.coincidir('OPERATOR')
+            derecha = self.termino()
+            izquierda = NodoOperacion(izquierda, operador[1], derecha)
         return izquierda
-    
+
     def termino(self):
         token = self.obtener_token_actual()
         if token[0] == 'NUMBER':
             return NodoNumero(self.coincidir('NUMBER'))
         elif token[0] == 'IDENTIFIER':
             return NodoIdentificador(self.coincidir('IDENTIFIER'))
+        elif token[0] == 'STRING':
+            return NodoString(self.coincidir('STRING'))
         else:
-            raise SyntaxError(f'Error sintactico: Expresion no valida {token}')
+            raise SyntaxError(f'Error sintactico: Termino no valido {token}')
             
     def expresion(self):
         """
@@ -357,7 +362,7 @@ int suma(int a, int b) {
 }
 
 void main() {
-    suma(4,3);
+    int resultado = suma(4, 3);
 }
 """
 
@@ -426,3 +431,16 @@ def imprimir_ast(nodo):
 parser = Parser(tokens)
 arbol_ast = parser.parsear()    
 print(json.dumps(imprimir_ast(arbol_ast), indent=1))
+
+
+# nodo_exp = NodoOperacion(NodoNumero(5), '+', NodoNumero(8))
+# print("Expresion original:", nodo_exp)
+
+# exp_opt = nodo_exp.optimizar()
+# print("Expresion optimizada:", exp_opt)
+
+# codigo_python = arbol_ast.traducir()
+# print(codigo_python)
+
+codigo_asm = arbol_ast.generar_codigo()
+print(codigo_asm)
