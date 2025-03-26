@@ -270,43 +270,60 @@ class NodoDeclaracion(NodoAST):
         return f"; Declaración de variable: {self.tipo} {self.nombre}"
     
 class NodoIf(NodoAST):
-    def __init__(self, condicion, cuerpo_if, cuerpo_else=None):
+    def __init__(self, condicion, cuerpo_if, cuerpo_else=None, else_ifs=None):
         self.condicion = condicion
         self.cuerpo_if = cuerpo_if
         self.cuerpo_else = cuerpo_else
+        self.else_ifs = else_ifs if else_ifs is not None else []
         
     def traducir(self):
-        if_code = f"if {self.condicion.traducir()}:\n    " + "\n    ".join(c.traducir() for c in self.cuerpo_if)
+        codigo = f"if {self.condicion.traducir()}:\n    " + "\n    ".join(c.traducir() for c in self.cuerpo_if)
+        
+        for cond, cuerpo in self.else_ifs:
+            codigo += f"\nelif {cond.traducir()}:\n    " + "\n    ".join(c.traducir() for c in cuerpo)
+            
         if self.cuerpo_else:
-            if_code += "\nelse:\n    " + "\n    ".join(c.traducir() for c in self.cuerpo_else)
-        return if_code
+            codigo += "\nelse:\n    " + "\n    ".join(c.traducir() for c in self.cuerpo_else)
+            
+        return codigo
     
     def generar_codigo(self):
         codigo = []
-        # Generar codigo para la condicion
+        # Generar codigo para la condicion principal
         codigo.append(self.condicion.generar_codigo())
         
-        # Comparacion y salto condicional
-        label_else = f"L{id(self)}_else"
         label_end = f"L{id(self)}_end"
+        label_next = f"L{id(self)}_next"
         
         codigo.append(f"    cmp eax, 0")
-        codigo.append(f"    je {label_else}")
+        codigo.append(f"    je {label_next}")
         
         # Codigo para el cuerpo if
         for instruccion in self.cuerpo_if:
             codigo.append(instruccion.generar_codigo())
         codigo.append(f"    jmp {label_end}")
         
+        # Codigo para los else if
+        for i, (cond, cuerpo) in enumerate(self.else_ifs):
+            codigo.append(f"{label_next}:")
+            label_next = f"L{id(self)}_next_{i}"
+            
+            codigo.append(cond.generar_codigo())
+            codigo.append(f"    cmp eax, 0")
+            codigo.append(f"    je {label_next}")
+            
+            for instruccion in cuerpo:
+                codigo.append(instruccion.generar_codigo())
+            codigo.append(f"    jmp {label_end}")
+        
         # Codigo para el else (si existe)
-        codigo.append(f"{label_else}:")
         if self.cuerpo_else:
+            codigo.append(f"{label_next}:")
             for instruccion in self.cuerpo_else:
                 codigo.append(instruccion.generar_codigo())
         
         codigo.append(f"{label_end}:")
         return "\n".join(codigo)
-
 class NodoComparacion(NodoAST):
     def __init__(self, izquierda, operador, derecha):
         self.izquierda = izquierda

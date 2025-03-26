@@ -202,6 +202,14 @@ class Parser:
 
     def termino(self):
         token = self.obtener_token_actual()
+        
+        # Manejar números negativos
+        if token[0] == 'OPERATOR' and token[1] == '-':
+            self.coincidir('OPERATOR')  # Consumir el '-'
+            numero = self.coincidir('NUMBER')
+            # Crear un nodo número con valor negativo
+            return NodoNumero(('NUMBER', '-' + numero[1]))
+        
         if token[0] == 'NUMBER':
             return NodoNumero(self.coincidir('NUMBER'))
         elif token[0] == 'IDENTIFIER':
@@ -231,31 +239,49 @@ class Parser:
 
     def bucle_if(self):
         """
-        Analiza la estructura de una sentencia if-else.
+        Analiza la estructura de una sentencia if-else if-else.
         """
         self.coincidir('KEYWORD')  # Se espera un if
         self.coincidir('DELIMITER')  # Se espera un (
         
-        # Analizar la condicion (ahora usando expresion_logica que devuelve un nodo)
         condicion = self.expresion_logica()
         
         self.coincidir('DELIMITER')  # Se espera un )
         self.coincidir('DELIMITER')  # Se espera un {
         
-        # Analizar cuerpo del if
         cuerpo_if = self.cuerpo()
         
         self.coincidir('DELIMITER')  # Se espera un }
         
-        # Manejo opcional de else
         cuerpo_else = None
-        if self.obtener_token_actual() and self.obtener_token_actual()[1] == 'else':
-            self.coincidir('KEYWORD')  # Se espera un else
-            self.coincidir('DELIMITER')  # Se espera un {
-            cuerpo_else = self.cuerpo()
-            self.coincidir('DELIMITER')  # Se espera un }
+        else_ifs = []
         
-        return NodoIf(condicion, cuerpo_if, cuerpo_else)
+        while self.obtener_token_actual() and self.obtener_token_actual()[1] == 'else':
+            self.coincidir('KEYWORD')  # Se espera un else
+            
+            # Verificar si es un else if
+            if self.obtener_token_actual() and self.obtener_token_actual()[1] == 'if':
+                self.coincidir('KEYWORD')  # Se espera un if
+                self.coincidir('DELIMITER')  # Se espera un (
+                
+                condicion_else_if = self.expresion_logica()
+                
+                self.coincidir('DELIMITER')  # Se espera un )
+                self.coincidir('DELIMITER')  # Se espera un {
+                
+                cuerpo_else_if = self.cuerpo()
+                
+                self.coincidir('DELIMITER')  # Se espera un }
+                
+                else_ifs.append((condicion_else_if, cuerpo_else_if))
+            else:
+                # Es un else simple
+                self.coincidir('DELIMITER')  # Se espera un {
+                cuerpo_else = self.cuerpo()
+                self.coincidir('DELIMITER')  # Se espera un }
+                break  # No puede haber mas else o else if despues de un else
+        
+        return NodoIf(condicion, cuerpo_if, cuerpo_else, else_ifs)
 
     def expresion_logica(self):
         """
@@ -265,11 +291,22 @@ class Parser:
         operador = None
         derecha = None
         
+        # Manejar signo negativo si existe
+        negativo = False
+        if self.obtener_token_actual()[0] == 'OPERATOR' and self.obtener_token_actual()[1] == '-':
+            negativo = True
+            self.coincidir('OPERATOR')
+        
         # Obtener el operando izquierdo
         if self.obtener_token_actual()[0] == 'IDENTIFIER':
             izquierda = NodoIdentificador(self.coincidir('IDENTIFIER'))
         elif self.obtener_token_actual()[0] == 'NUMBER':
-            izquierda = NodoNumero(self.coincidir('NUMBER'))
+            num = self.coincidir('NUMBER')
+            if negativo:
+                izquierda = NodoNumero(('NUMBER', '-' + num[1]))
+                negativo = False
+            else:
+                izquierda = NodoNumero(num)
         else:
             raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER o NUMBER, pero se encontro {self.obtener_token_actual()}")
 
@@ -378,6 +415,8 @@ codigo_fuente = """
 int condicional(int x) {
     if (x > 0) {
         return 1;
+    } else if (x < 0) {
+        return -1;
     } else {
         return 0;
     }
