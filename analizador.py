@@ -50,7 +50,7 @@ class Parser:
             funcion = self.funcion()
             funciones.append(funcion)
 
-        # Verificar que exista al menos una función 'main'
+        # Verificar que exista al menos una funcion 'main'
         existe_main = any(funcion.nombre == 'main' for funcion in funciones)
         if not existe_main:
             raise SyntaxError("Error sintactico: Debe existir una funcion 'main' en el codigo.")
@@ -62,14 +62,12 @@ class Parser:
         return NodoPrograma(funciones)  # Devolver un nodo Programa
     
     def llamada_funcion(self):
-        """
-        Procesa una llamada a funcion, como `suma(4, 3);`.
-        """
-        nombre_funcion = self.coincidir('IDENTIFIER')  # Nombre de la funcion
-        self.coincidir('DELIMITER')  # Se espera un '('
-        argumentos = self.argumentos()  # Analizar los argumentos
-        self.coincidir('DELIMITER')  # Se espera un ')'
-        self.coincidir('DELIMITER')  # Se espera un ';'
+        """Procesa una llamada a funcion, como `suma(4, 3)` o `condicional(valor)`."""
+        nombre_funcion = self.coincidir('IDENTIFIER')
+        self.coincidir('DELIMITER')  # Consumir '('
+        argumentos = self.argumentos()
+        self.coincidir('DELIMITER')  # Consumir ')'
+
         return NodoLlamadaFuncion(nombre_funcion[1], argumentos)
     
     def argumentos(self):
@@ -98,7 +96,7 @@ class Parser:
     def parametros(self):
         parametros = []
         # Reglas para parametros: KEYWORD IDENTIFIER (, KEYWORD IDENTIFIER)*
-        while self.obtener_token_actual() and self.obtener_token_actual()[1] != ')':  # Mientras no se cierre el paréntesis
+        while self.obtener_token_actual() and self.obtener_token_actual()[1] != ')':  # Mientras no se cierre el parentesis
             tipo = self.coincidir('KEYWORD')  # Tipo del parametro (ej. int)
             nombre = self.coincidir('IDENTIFIER')  # Nombre del parametro (ej. a)
             parametros.append(NodoParametro(tipo[1], nombre[1]))  # Guardar el tipo y nombre
@@ -108,12 +106,17 @@ class Parser:
 
     def declaracion(self):
         tipo = self.coincidir('KEYWORD')  # Tipo de dato (ej. 'int')
-        nombre = self.coincidir('IDENTIFIER')  # Nombre de la variable (ej. 'c')
+        nombre = self.coincidir('IDENTIFIER')  # Nombre de la variable
 
-        # Manejar asignación opcional (ej. '= a + b')
+        # Manejar asignacion opcional
         if self.obtener_token_actual() and self.obtener_token_actual()[1] == '=':
             self.coincidir('OPERATOR')  # Consumir '='
-            expresion = self.expresion_ing()  # Analizar la expresión (ej. 'a + b')
+            # Puede ser una expresion o una llamada a funcion
+            if self.obtener_token_actual()[0] == 'IDENTIFIER' and \
+            self.tokens[self.pos + 1][1] == '(':
+                expresion = self.llamada_funcion()
+            else:
+                expresion = self.expresion_ing()
             nodo = NodoAsignacion(nombre, expresion)
         else:
             nodo = NodoDeclaracion(tipo[1], nombre[1])
@@ -153,6 +156,7 @@ class Parser:
                 elif token_actual[1] == 'return':
                     instrucciones.append(self.retorno())
                 elif token_actual[1] in ['int', 'float', 'void', 'double', 'char']:
+                    # Es una declaracion (posiblemente con inicializacion)
                     instrucciones.append(self.declaracion())
                 else:
                     raise SyntaxError(f'Error sintactico: Keyword no reconocido: {token_actual}')
@@ -160,9 +164,24 @@ class Parser:
             elif token_actual[0] == 'IDENTIFIER':
                 siguiente_token = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
                 if siguiente_token and siguiente_token[1] == '(':
-                    instrucciones.append(self.llamada_funcion())
+                    # Es una llamada a funcion
+                    llamada = self.llamada_funcion()
+                    # Verificar si es una asignacion (ej: resultado = funcion())
+                    if self.obtener_token_actual() and self.obtener_token_actual()[1] == '=':
+                        self.coincidir('OPERATOR')
+                        nombre = token_actual
+                        instrucciones.append(NodoAsignacion(nombre, llamada))
+                    else:
+                        instrucciones.append(llamada)
+                elif siguiente_token and siguiente_token[1] == '=':
+                    # Es una asignacion simple
+                    nombre = self.coincidir('IDENTIFIER')
+                    self.coincidir('OPERATOR')
+                    expresion = self.expresion_ing()
+                    self.coincidir('DELIMITER')
+                    instrucciones.append(NodoAsignacion(nombre, expresion))
                 else:
-                    instrucciones.append(self.asignacion())
+                    raise SyntaxError(f'Error sintactico: Identificador no seguido de asignacion o llamada: {token_actual}')
 
             elif token_actual[0] in ['NUMBER', 'STRING']:
                 instrucciones.append(self.expresion_ing())
@@ -174,7 +193,7 @@ class Parser:
         return instrucciones
 
     def expresion_ing(self):
-        izquierda = self.termino()  # Obtener el primer término
+        izquierda = self.termino()  # Obtener el primer termino
         while self.obtener_token_actual() and self.obtener_token_actual()[0] == 'OPERATOR':
             operador = self.coincidir('OPERATOR')
             derecha = self.termino()
@@ -199,14 +218,14 @@ class Parser:
         - "hola" + nombre
         """
         if self.obtener_token_actual()[0] in ['IDENTIFIER', 'NUMBER', 'STRING']:
-            self.coincidir(self.obtener_token_actual()[0])  # Consumir identificador, número o cadena
+            self.coincidir(self.obtener_token_actual()[0])  # Consumir identificador, numero o cadena
         else:
             raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER, NUMBER o STRING, pero se encontro {self.obtener_token_actual()}")
 
         while self.obtener_token_actual() and self.obtener_token_actual()[0] in ['OPERATOR']:
             self.coincidir('OPERATOR')  # Consumir operador
             if self.obtener_token_actual()[0] in ['IDENTIFIER', 'NUMBER', 'STRING']:
-                self.coincidir(self.obtener_token_actual()[0])  # Consumir identificador, número o cadena
+                self.coincidir(self.obtener_token_actual()[0])  # Consumir identificador, numero o cadena
             else:
                 raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER, NUMBER o STRING despues de {self.obtener_token_anterior()}")
 
@@ -215,62 +234,62 @@ class Parser:
         Analiza la estructura de una sentencia if-else.
         """
         self.coincidir('KEYWORD')  # Se espera un if
-        self.coincidir('DELIMITER')  #Se espera un (
-
-        # Llamar a expresion_logica() para procesar la condicion
-        self.expresion_logica()
-
+        self.coincidir('DELIMITER')  # Se espera un (
+        
+        # Analizar la condicion (ahora usando expresion_logica que devuelve un nodo)
+        condicion = self.expresion_logica()
+        
         self.coincidir('DELIMITER')  # Se espera un )
         self.coincidir('DELIMITER')  # Se espera un {
-        self.cuerpo()  
+        
+        # Analizar cuerpo del if
+        cuerpo_if = self.cuerpo()
+        
         self.coincidir('DELIMITER')  # Se espera un }
-
+        
         # Manejo opcional de else
+        cuerpo_else = None
         if self.obtener_token_actual() and self.obtener_token_actual()[1] == 'else':
             self.coincidir('KEYWORD')  # Se espera un else
             self.coincidir('DELIMITER')  # Se espera un {
-            self.cuerpo()  
+            cuerpo_else = self.cuerpo()
             self.coincidir('DELIMITER')  # Se espera un }
+        
+        return NodoIf(condicion, cuerpo_if, cuerpo_else)
 
     def expresion_logica(self):
         """
-        Analiza expresiones logicas como:
-        - resultado > x
-        - a == b
-        - x != 10 && y < 5
+        Analiza expresiones logicas y devuelve un NodoComparacion.
         """
-        # La expresion logica puede iniciar con un IDENTIFIER o un NUMBER
-        if self.obtener_token_actual()[0] in ['IDENTIFIER', 'NUMBER']:
-            self.coincidir(self.obtener_token_actual()[0])  # Consumir el identificador o numero
+        izquierda = None
+        operador = None
+        derecha = None
+        
+        # Obtener el operando izquierdo
+        if self.obtener_token_actual()[0] == 'IDENTIFIER':
+            izquierda = NodoIdentificador(self.coincidir('IDENTIFIER'))
+        elif self.obtener_token_actual()[0] == 'NUMBER':
+            izquierda = NodoNumero(self.coincidir('NUMBER'))
         else:
             raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER o NUMBER, pero se encontro {self.obtener_token_actual()}")
 
-        # Esperar un operador relacional (>=, <=, ==, !=, >, <, !)
-        if self.obtener_token_actual()[1] in ['<', '>', '!']:
-            self.coincidir('OPERATOR')  # Consumir operador
-            if self.obtener_token_actual()[0] == 'OPERATOR' and self.obtener_token_actual()[1] == '=':
-                self.coincidir('OPERATOR')
-        elif self.obtener_token_actual()[1] == '=':
-            self.coincidir('OPERATOR')
-            if self.obtener_token_actual()[1] != '=':
-                 raise SyntaxError(f"Error sintactico: Se esperaba un =, pero se encontro {self.obtener_token_actual()}")
-            self.coincidir('OPERATOR')
-        else:
-            raise SyntaxError(f"Error sintactico: Se esperaba un OPERADOR RELACIONAL, pero se encontro {self.obtener_token_actual()}")
-
-        # Esperar otro IDENTIFIER o NUMBER despues del operador
-        if self.obtener_token_actual()[0] in ['IDENTIFIER', 'NUMBER']:
-            self.coincidir(self.obtener_token_actual()[0])  # Consumir el identificador o numero
+        # Obtener el operador
+        operador = self.coincidir('OPERATOR')[1]
+        
+        # Manejar operadores compuestos (==, !=, >=, <=)
+        if self.obtener_token_actual()[0] == 'OPERATOR':
+            segundo_op = self.coincidir('OPERATOR')[1]
+            operador += segundo_op
+        
+        # Obtener el operando derecho
+        if self.obtener_token_actual()[0] == 'IDENTIFIER':
+            derecha = NodoIdentificador(self.coincidir('IDENTIFIER'))
+        elif self.obtener_token_actual()[0] == 'NUMBER':
+            derecha = NodoNumero(self.coincidir('NUMBER'))
         else:
             raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER o NUMBER, pero se encontro {self.obtener_token_actual()}")
 
-        # Manejo de operadores logicos compuestos (&&, ||)
-        while self.obtener_token_actual() and self.obtener_token_actual()[1] in ['&&', '||']:
-            self.coincidir('OPERATOR')  # Consumir operador logico
-            if self.obtener_token_actual()[0] in ['IDENTIFIER', 'NUMBER']:
-                self.coincidir(self.obtener_token_actual()[0])  # Consumir el identificador o numero
-            else:
-                raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER o NUMBER despues de {self.obtener_token_anterior()}")
+        return NodoComparacion(izquierda, operador, derecha)
 
     def printf_llamada(self):
         """
@@ -286,7 +305,7 @@ class Parser:
         if token_actual[0] == 'STRING' or token_actual[0] == 'IDENTIFIER':
             self.coincidir(token_actual[0])  # Se espera una cadena o un identificador
         else:
-            raise SyntaxError(f"Error sintáctico: Se esperaba STRING o IDENTIFIER, pero se encontro {token_actual}")
+            raise SyntaxError(f"Error sintactico: Se esperaba STRING o IDENTIFIER, pero se encontro {token_actual}")
 
         # Puede haber mas argumentos separados por comas
         while self.obtener_token_actual() and self.obtener_token_actual()[1] == ',':
@@ -356,13 +375,17 @@ class Parser:
 
 # === Ejemplo de Uso ===
 codigo_fuente = """
-int suma(int a, int b) {
-    int c = a + b;
-    return c;
+int condicional(int x) {
+    if (x > 0) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 void main() {
-    int resultado = suma(4, 3);
+    int valor = 5;
+    int resultado = condicional(valor);
 }
 """
 

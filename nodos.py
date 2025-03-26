@@ -269,3 +269,80 @@ class NodoDeclaracion(NodoAST):
     def generar_codigo(self):
         return f"; Declaración de variable: {self.tipo} {self.nombre}"
     
+class NodoIf(NodoAST):
+    def __init__(self, condicion, cuerpo_if, cuerpo_else=None):
+        self.condicion = condicion
+        self.cuerpo_if = cuerpo_if
+        self.cuerpo_else = cuerpo_else
+        
+    def traducir(self):
+        if_code = f"if {self.condicion.traducir()}:\n    " + "\n    ".join(c.traducir() for c in self.cuerpo_if)
+        if self.cuerpo_else:
+            if_code += "\nelse:\n    " + "\n    ".join(c.traducir() for c in self.cuerpo_else)
+        return if_code
+    
+    def generar_codigo(self):
+        codigo = []
+        # Generar codigo para la condicion
+        codigo.append(self.condicion.generar_codigo())
+        
+        # Comparacion y salto condicional
+        label_else = f"L{id(self)}_else"
+        label_end = f"L{id(self)}_end"
+        
+        codigo.append(f"    cmp eax, 0")
+        codigo.append(f"    je {label_else}")
+        
+        # Codigo para el cuerpo if
+        for instruccion in self.cuerpo_if:
+            codigo.append(instruccion.generar_codigo())
+        codigo.append(f"    jmp {label_end}")
+        
+        # Codigo para el else (si existe)
+        codigo.append(f"{label_else}:")
+        if self.cuerpo_else:
+            for instruccion in self.cuerpo_else:
+                codigo.append(instruccion.generar_codigo())
+        
+        codigo.append(f"{label_end}:")
+        return "\n".join(codigo)
+
+class NodoComparacion(NodoAST):
+    def __init__(self, izquierda, operador, derecha):
+        self.izquierda = izquierda
+        self.operador = operador
+        self.derecha = derecha
+        
+    def traducir(self):
+        return f"{self.izquierda.traducir()} {self.operador} {self.derecha.traducir()}"
+    
+    def generar_codigo(self):
+        codigo = []
+        # Cargar operando izquierdo
+        codigo.append(self.izquierda.generar_codigo())
+        codigo.append("    push eax")
+        
+        # Cargar operando derecho
+        codigo.append(self.derecha.generar_codigo())
+        codigo.append("    pop ebx")
+        
+        # Comparacion
+        codigo.append("    cmp ebx, eax")
+        
+        # Configurar eax segun la comparacion
+        if self.operador == '>':
+            codigo.append("    setg al")
+        elif self.operador == '<':
+            codigo.append("    setl al")
+        elif self.operador == '>=':
+            codigo.append("    setge al")
+        elif self.operador == '<=':
+            codigo.append("    setle al")
+        elif self.operador == '==':
+            codigo.append("    sete al")
+        elif self.operador == '!=':
+            codigo.append("    setne al")
+            
+        codigo.append("    movzx eax, al")
+        return "\n".join(codigo)
+    
