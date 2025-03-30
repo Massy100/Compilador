@@ -132,6 +132,17 @@ class Parser:
         expresion = self.expresion_ing()
         self.coincidir('DELIMITER') # ;
         return NodoAsignacion(nombre, expresion)
+    
+    def incremento(self):
+        # Gramatica para el cuerpo: return IDENTIFIER OPERATOR OPERATOR;
+        variable = self.coincidir('IDENTIFIER') # Identificador <nombre de la variable>
+        operador1 = self.coincidir('OPERATOR') # Operador ej. ++
+        operador2 = self.coincidir('OPERATOR') # Operador ej. ;
+        if operador1[1] + operador2[1] not in ['++','--']:
+            raise SyntaxError(f'Error sintactico: se esperaba una declaracion valida, pero se encontro: {operador1[1],operador2[1]}')
+        return NodoIncremento(variable[1], None, operador1[1] + operador2[1])
+
+        
 
     def retorno(self):
         self.coincidir('KEYWORD') # return
@@ -155,6 +166,10 @@ class Parser:
                     instrucciones.append(self.printf_llamada())
                 elif token_actual[1] == 'return':
                     instrucciones.append(self.retorno())
+                elif token_actual[1] == 'while':
+                    instrucciones.append(self.bucle_while())
+                elif token_actual[1] == 'for':
+                    instrucciones.append(self.bucle_for())
                 elif token_actual[1] in ['int', 'float', 'void', 'double', 'char']:
                     # Es una declaracion (posiblemente con inicializacion)
                     instrucciones.append(self.declaracion())
@@ -236,7 +251,7 @@ class Parser:
                 self.coincidir(self.obtener_token_actual()[0])  # Consumir identificador, numero o cadena
             else:
                 raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER, NUMBER o STRING despues de {self.obtener_token_anterior()}")
-
+    
     def bucle_if(self):
         """
         Analiza la estructura de una sentencia if-else if-else.
@@ -282,6 +297,7 @@ class Parser:
                 break  # No puede haber mas else o else if despues de un else
         
         return NodoIf(condicion, cuerpo_if, cuerpo_else, else_ifs)
+    
 
     def expresion_logica(self):
         """
@@ -353,27 +369,28 @@ class Parser:
         self.coincidir('DELIMITER')  # Se espera un ;
 
     def bucle_for(self):
-        # Regla para el for KEYWORD DELIMITER DECLARACION EXPRESION_LOGICA DELIMITER INCREMENT DELIMITER DELIMITER
-        """
-        Maneja la estructura de un bucle for.
-        """
+        # Regla para bucle for: KEYWORD DELIMITER ASIGNACION DELIMITER EXPRESION_LOGICA DELIMITER INCREMENTO DELIMITER CUERPO DELIMITER
         self.coincidir('KEYWORD')  # Se espera un for
         self.coincidir('DELIMITER')  # Se espera un (
-
-        self.declaracion() 
-
-        self.expresion_logica() 
+        
+        inicializacion = self.asignacion()  # Por ejemplo, "int i = 0"
+        
+        #self.coincidir('DELIMITER')  # Se espera un ;
+        
+        condicion = self.expresion_logica()  # Por ejemplo, "i < 10"
+        
         self.coincidir('DELIMITER')  # Se espera un ;
+        
+        incremento = self.incremento()  # Por ejemplo, "i++"
+        
+        self.coincidir('DELIMITER')  # Se espera un )
+        self.coincidir('DELIMITER')  # Se espera un {
+        
+        cuerpo_for = self.cuerpo()  # Cuerpo del bucle
+        
+        self.coincidir('DELIMITER')  # Se espera un }
 
-        self.operador_abreviado() 
-        # self.coincidir('DELIMITER')  # Se espera un )
-
-        if self.obtener_token_actual()[0] == 'KEYWORD':
-            self.cuerpo()
-        else:
-            self.coincidir('DELIMITER')  # Se espera un {
-            self.cuerpo()  
-            self.coincidir('DELIMITER')  # Se espera un }
+        return NodoFor(inicializacion, condicion, incremento, cuerpo_for)
 
     def return_statement(self):
         self.coincidir('KEYWORD')
@@ -402,13 +419,20 @@ class Parser:
         # Regla para bucle while: KEYWORD DELIMITER EXPRESION_LOGICA DELIMITER DELIMITER CUERPO DELIMITER
         self.coincidir('KEYWORD') # Se espera un while
         self.coincidir('DELIMITER') # Se espera un (
-        self.expresion_logica()
+
+        condicion = self.expresion_logica()
+
         self.coincidir('DELIMITER') # Se espera un )
         self.coincidir('DELIMITER') # Se espera un {
+
+        cuerpo_while = self.cuerpo()
+        
         #self.printf_llamada() 
         #self.increment()
-        self.cuerpo()
+        
         self.coincidir('DELIMITER')# Se espera un }
+
+        return NodoWhile(condicion, cuerpo_while)
 
 # === Ejemplo de Uso ===
 codigo_fuente = """
@@ -424,6 +448,12 @@ int condicional(int x) {
 
 void main() {
     int valor = 5;
+    while (valor > 0) {
+        valor = valor - 1;
+    }
+    for (int i = 0; i <= 1; i++) {
+        valor = valor + 1;
+    }
     int resultado = condicional(valor);
 }
 """

@@ -268,7 +268,68 @@ class NodoDeclaracion(NodoAST):
         
     def generar_codigo(self):
         return f"; Declaración de variable: {self.tipo} {self.nombre}"
+class NodoWhile(NodoAST):
+    def __init__(self, condicion, cuerpo):
+        self.condicion = condicion
+        self.cuerpo = cuerpo
+        
+    def traducir(self):
+        codigo = f"while {self.condicion.traducir()}:\n    " + "\n    ".join(c.traducir() for c in self.cuerpo)
+        return codigo
     
+    def generar_codigo(self):
+        label_start = f"L{id(self)}_start"
+        label_end = f"L{id(self)}_end"
+        
+        codigo = []
+        codigo.append(f"{label_start}: ; inicio de bucle while")
+        codigo.append(self.condicion.generar_codigo())
+        codigo.append("    cmp eax, 0 ; comparar la condicion de bucle while")
+        codigo.append(f"    je {label_end} ; terninar el bucle si la condicion es falsa")
+        
+        for instruccion in self.cuerpo:
+            codigo.append(instruccion.generar_codigo())
+        codigo.append(f"    jmp {label_start} ; volvar al inicio del bucle while")
+        
+        codigo.append(f"{label_end}: ; fin de bucle while")
+        return "\n".join(codigo)
+    
+class NodoFor(NodoAST):
+    def __init__(self, inicializacion, condicion, incremento, cuerpo):
+        self.inicializacion = inicializacion
+        self.condicion = condicion
+        self.incremento = incremento
+        self.cuerpo = cuerpo
+    
+    def traducir(self):
+        codigo = f"{self.inicializacion.traducir()}\nwhile {self.condicion.traducir()}:\n    " + \
+                 "\n    ".join(c.traducir() for c in self.cuerpo) + \
+                 f"\n    {self.incremento.traducir()}"
+        return codigo
+
+    def generar_codigo(self):
+        label_start = f"L{id(self)}_start"
+        label_end = f"L{id(self)}_end"
+
+        codigo = []
+        codigo.append(self.inicializacion.generar_codigo())  # codigo de inicialización
+
+        codigo.append(f"{label_start}: ; inicio del bucle for")
+        codigo.append(self.condicion.generar_codigo())
+        codigo.append("    cmp eax, 0 ; comparar la condicion del for")
+        codigo.append(f"    je {label_end} ; salir del bucle si la condicion es falsa")
+
+        for instruccion in self.cuerpo:
+            codigo.append(instruccion.generar_codigo())
+
+        codigo.append(self.incremento.generar_codigo())  # codigo del incremento
+        codigo.append(f"    jmp {label_start} ; volver al inicio del bucle for")
+
+        codigo.append(f"{label_end}: ; fin del bucle for")
+        return "\n".join(codigo)
+
+
+           
 class NodoIf(NodoAST):
     def __init__(self, condicion, cuerpo_if, cuerpo_else=None, else_ifs=None):
         self.condicion = condicion
@@ -324,6 +385,29 @@ class NodoIf(NodoAST):
         
         codigo.append(f"{label_end}:")
         return "\n".join(codigo)
+class NodoIncremento(NodoAST):
+    def __init__(self, variable, valor=None, tipo="++"):
+        self.variable = variable
+        self.valor = valor
+        self.tipo = tipo
+
+    def traducir(self):
+        if self.tipo == "++":
+            return f"{self.variable} += 1"
+        elif self.tipo == "--":
+            return f"{self.variable} -= 1"
+        else:
+            return f"{self.variable} = {self.valor.traducir()}"
+
+    def generar_codigo(self):
+        if self.tipo == "++":
+            return f"    mov eax, [{self.variable}]\n    add eax, 1\n    mov [{self.variable}], eax  ; {self.variable}++"
+        elif self.tipo == "--":
+            return f"    mov eax, [{self.variable}]\n    sub eax, 1\n    mov [{self.variable}], eax  ; {self.variable}--"
+        else:  # Asignacion normal
+            return f"    mov eax, {self.valor.generar_codigo()}  ; Cargar el valor en eax\n    mov [{self.variable}], eax  ; Asignar el valor a {self.variable}"
+
+
 class NodoComparacion(NodoAST):
     def __init__(self, izquierda, operador, derecha):
         self.izquierda = izquierda
