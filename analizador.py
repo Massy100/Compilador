@@ -520,6 +520,44 @@ def imprimir_ast(nodo):
         }
     return {}
 
+def guardar_archivo(codigo_ensamblador, nombre_archivo="programa.s"):
+    """
+    Guarda el codigo ensamblador en un archivo .s en la misma carpeta,
+    agregando automaticamente las secciones .data y .text con las declaraciones
+    basicas, usando _main para compatibilidad con MinGW en Windows.
+    
+    Args:
+        codigo_ensamblador (str): El codigo ensamblador generado.
+        nombre_archivo (str): Nombre del archivo de salida (por defecto "programa.s").
+    """
+    # Encabezado con las declaraciones basicas para MinGW
+    encabezado = """section .data
+    x          dd 0     ; Define 'x' como entero de 32 bits
+    valor      dd 0     ; Define 'valor'
+    i          dd 0     ; Define 'i'
+    resultado  dd 0     ; Define 'resultado'
+
+section .text
+    global _condicional  ; Hace visible la función 'condicional'
+    global _main        ; Hace visible la función 'main' (con _ para MinGW)
+
+"""
+
+    # Reemplazar 'main' por '_main' y 'condicional' por '_condicional' en el código generado
+    codigo_adaptado = codigo_ensamblador.replace('main:', '_main:')
+    codigo_adaptado = codigo_adaptado.replace('condicional:', '_condicional:')
+    codigo_adaptado = codigo_adaptado.replace('call condicional', 'call _condicional')
+
+    try:
+        with open(nombre_archivo, "w") as archivo:
+            # Escribir el encabezado primero
+            archivo.write(encabezado)
+            # Luego el código ensamblador adaptado
+            archivo.write(codigo_adaptado)
+        print(f"Codigo ensamblador guardado en '{nombre_archivo}' (adaptado para MinGW)")
+    except Exception as e:
+        print(f"Error al guardar el archivo: {e}")
+
 parser = Parser(tokens)
 arbol_ast = parser.parsear()    
 print(json.dumps(imprimir_ast(arbol_ast), indent=1))
@@ -536,3 +574,6 @@ print(json.dumps(imprimir_ast(arbol_ast), indent=1))
 
 codigo_asm = arbol_ast.generar_codigo()
 print(codigo_asm)
+
+print("Codigo ensamblador generado:\n", codigo_asm)
+guardar_archivo(codigo_asm)
