@@ -461,6 +461,29 @@ def seleccionar_archivo():
         print("No se selecciono ningun archivo")
         return None
 
+# --------- Analisis Semantico ------------------
+class AnalizadorSemantico:
+    def __init__(self):
+        self.tabla_simbolos = {}
+        
+    def analizar(self, nodo):
+        metodo = f'visitar_{type(nodo).__name__}'
+        if hasattr(self, metodo)(nodo):
+            return getattr(self, metodo)(nodo)
+        else:
+            raise Exception(f'No se ha implementado en analisis semantico para {type(nodo).__name__}')
+        
+    def visitar_NodoFuncion(self, nodo):
+        if nodo.nombre[1] in self.tabla_simbolos:
+            raise Exception(f'Error semantico: La funcion {nodo.nombre[1]} ya esta definida')
+        
+        self.tabla_simbolos[nodo.nombre[1]] = {'tipo': nodo.parametros[0].tipo[1], 'parametros': nodo.parametros}
+        
+        for param in nodo.parametros:
+            self.tabla_simbolos[param.nombre[1]] = {'tipo': param.tipo[1]}
+            
+        for instruccion in nodo.cuerpo:
+            self.analizar(instruccion)
 
 # === Codigo en Uso ===
 codigo_fuente = seleccionar_archivo()
