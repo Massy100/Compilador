@@ -1,6 +1,8 @@
 import re
 from nodos import *
 import json
+import tkinter as tk
+from tkinter import filedialog
 
 # === Analisis Lexico ===
 # Definir los patrones para los diferentes tipos de tokens
@@ -433,30 +435,35 @@ class Parser:
         self.coincidir('DELIMITER')# Se espera un }
 
         return NodoWhile(condicion, cuerpo_while)
+    
+def seleccionar_archivo():
+    root = tk.Tk()
+    root.withdraw()  
+    
+    # Configurar el dialogo para solo permitir archivos TXT
+    archivo = filedialog.askopenfilename(
+        title="Seleccionar archivo TXT",
+        filetypes=[("Archivos de texto", "*.txt"), ("Todos los archivos", "*.*")]
+    )
+    
+    if archivo:
+        if not archivo.lower().endswith('.txt'):
+            print("Error: Solo se admite archivo con extension .txt")
+            return None
+        try:
+            with open(archivo, 'r', encoding='utf-8') as file:
+                codigo_fuente = file.read()
+            return codigo_fuente
+        except Exception as e:
+            print(f"Error al leer el archivo: {e}")
+            return None
+    else:
+        print("No se selecciono ningun archivo")
+        return None
 
-# === Ejemplo de Uso ===
-codigo_fuente = """
-int condicional(int x) {
-    if (x > 0) {
-        return 1;
-    } else if (x < 0) {
-        return -1;
-    } else {
-        return 0;
-    }
-}
 
-void main() {
-    int valor = 5;
-    while (valor > 0) {
-        valor = valor - 1;
-    }
-    for (int i = 0; i <= 1; i++) {
-        valor = valor + 1;
-    }
-    int resultado = condicional(valor);
-}
-"""
+# === Codigo en Uso ===
+codigo_fuente = seleccionar_archivo()
 
 # Analisis lexico
 tokens = identificar_tokens(codigo_fuente)
