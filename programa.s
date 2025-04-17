@@ -19,11 +19,11 @@ _condicional:
     setg al
     movzx eax, al
     cmp eax, 0
-    je L2169094974128_next
+    je L2208800188240_next
     mov eax, 1 ; cargar constante 1
     ret ; retorno desde la subrutina
-    jmp L2169094974128_end
-L2169094974128_next:
+    jmp L2208800188240_end
+L2208800188240_next:
     mov eax, [x] ; cargar variable x
     push eax
     mov eax, 0 ; cargar constante 0
@@ -32,14 +32,14 @@ L2169094974128_next:
     setl al
     movzx eax, al
     cmp eax, 0
-    je L2169094974128_next_0
+    je L2208800188240_next_0
     mov eax, -1 ; cargar constante -1
     ret ; retorno desde la subrutina
-    jmp L2169094974128_end
-L2169094974128_next_0:
+    jmp L2208800188240_end
+L2208800188240_next_0:
     mov eax, 0 ; cargar constante 0
     ret ; retorno desde la subrutina
-L2169094974128_end:
+L2208800188240_end:
     mov esp, ebp
     pop ebp
     ret
@@ -50,7 +50,7 @@ _main:
     mov ebp, esp
     mov eax, 5 ; cargar constante 5
     mov [valor], eax ; asignar a valor
-L2169094974992_start: ; inicio de bucle while
+L2208800188960_start: ; inicio de bucle while
     mov eax, [valor] ; cargar variable valor
     push eax
     mov eax, 0 ; cargar constante 0
@@ -59,7 +59,7 @@ L2169094974992_start: ; inicio de bucle while
     setg al
     movzx eax, al
     cmp eax, 0 ; comparar la condicion de bucle while
-    je L2169094974992_end ; terninar el bucle si la condicion es falsa
+    je L2208800188960_end ; terninar el bucle si la condicion es falsa
     mov eax, [valor] ; cargar variable valor
     push eax; guardar en la pila
     mov eax, 1 ; cargar constante 1
@@ -67,11 +67,11 @@ L2169094974992_start: ; inicio de bucle while
     sub ebx, eax; ebx = ebx - eax
     mov eax, ebx; eax = ebx
     mov [valor], eax ; asignar a valor
-    jmp L2169094974992_start ; volvar al inicio del bucle while
-L2169094974992_end: ; fin de bucle while
+    jmp L2208800188960_start ; volvar al inicio del bucle while
+L2208800188960_end: ; fin de bucle while
     mov eax, 0 ; cargar constante 0
     mov [i], eax ; asignar a i
-L2169094975616_start: ; inicio del bucle for
+L2208800189584_start: ; inicio del bucle for
     mov eax, [i] ; cargar variable i
     push eax
     mov eax, 1 ; cargar constante 1
@@ -80,7 +80,7 @@ L2169094975616_start: ; inicio del bucle for
     setle al
     movzx eax, al
     cmp eax, 0 ; comparar la condicion del for
-    je L2169094975616_end ; salir del bucle si la condicion es falsa
+    je L2208800189584_end ; salir del bucle si la condicion es falsa
     mov eax, [valor] ; cargar variable valor
     push eax; guardar en la pila
     mov eax, 1 ; cargar constante 1
@@ -90,8 +90,8 @@ L2169094975616_start: ; inicio del bucle for
     mov eax, [i]
     add eax, 1
     mov [i], eax  ; i++
-    jmp L2169094975616_start ; volver al inicio del bucle for
-L2169094975616_end: ; fin del bucle for
+    jmp L2208800189584_start ; volver al inicio del bucle for
+L2208800189584_end: ; fin del bucle for
     mov eax, [valor] ; cargar variable valor
     push eax
     call _condicional

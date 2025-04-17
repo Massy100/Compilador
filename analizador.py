@@ -3,6 +3,7 @@ from nodos import *
 import json
 import tkinter as tk
 from tkinter import filedialog
+from semantico import *
 
 # === Analisis Lexico ===
 # Definir los patrones para los diferentes tipos de tokens
@@ -461,30 +462,6 @@ def seleccionar_archivo():
         print("No se selecciono ningun archivo")
         return None
 
-# --------- Analisis Semantico ------------------
-class AnalizadorSemantico:
-    def __init__(self):
-        self.tabla_simbolos = {}
-        
-    def analizar(self, nodo):
-        metodo = f'visitar_{type(nodo).__name__}'
-        if hasattr(self, metodo)(nodo):
-            return getattr(self, metodo)(nodo)
-        else:
-            raise Exception(f'No se ha implementado en analisis semantico para {type(nodo).__name__}')
-        
-    def visitar_NodoFuncion(self, nodo):
-        if nodo.nombre[1] in self.tabla_simbolos:
-            raise Exception(f'Error semantico: La funcion {nodo.nombre[1]} ya esta definida')
-        
-        self.tabla_simbolos[nodo.nombre[1]] = {'tipo': nodo.parametros[0].tipo[1], 'parametros': nodo.parametros}
-        
-        for param in nodo.parametros:
-            self.tabla_simbolos[param.nombre[1]] = {'tipo': param.tipo[1]}
-            
-        for instruccion in nodo.cuerpo:
-            self.analizar(instruccion)
-
 # === Codigo en Uso ===
 codigo_fuente = seleccionar_archivo()
 
@@ -607,3 +584,11 @@ print(codigo_asm)
 
 print("Codigo ensamblador generado:\n", codigo_asm)
 guardar_archivo(codigo_asm)
+
+analizador_semantico = AnalizadorSemantico()
+try:
+    analizador_semantico.analizar(arbol_ast)
+    print("\nTabla de simbolos:")
+    print(analizador_semantico.tabla_simbolos)
+except Exception as e:
+    print(f"\nError semantico: {e}")
