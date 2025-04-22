@@ -8,13 +8,32 @@ int condicional(int x) {
     }
 }
 
-void main() {
+float calcular_circunferencia(float diametro) {
+    const float pi = 3.14159f;
+    return pi * diametro;
+}
+
+int main() {
     int valor = 5;
+    int diametro_entero = 8;
+    
+    float pi = 3.14159f;
+    float diametro = 8.0f;
+    
     while (valor > 0) {
         valor = valor - 1;
     }
+    
     for (int i = 0; i <= 1; i++) {
         valor = valor + 1;
     }
-    int resultado = condicional(valor);
+    
+    int resultado_condicional = condicional(valor);
+    
+    float circunferencia = calcular_circunferencia(diametro);
+    
+    int temp_int = resultado_condicional;
+    float temp_float = circunferencia;
+    
+    return 0;
 }

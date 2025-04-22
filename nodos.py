@@ -203,7 +203,10 @@ class NodoNumero(NodoAST):
         return str(self.valor[1])
         
     def generar_codigo(self):
-        return f"    mov eax, {self.valor[1]} ; cargar constante {self.valor[1]}"
+        if '.' in self.valor[1] or 'f' in self.valor[1].lower():  # Es flotante
+            return f"    movss xmm0, [{self.valor[1]}] ; cargar flotante {self.valor[1]}"
+        else:  # Es entero
+            return f"    mov eax, {self.valor[1]} ; cargar entero {self.valor[1]}"
       
 class NodoLlamadaFuncion(NodoAST):
     # Nodo que representa una llamada a funcion
@@ -446,4 +449,16 @@ class NodoComparacion(NodoAST):
             
         codigo.append("    movzx eax, al")
         return "\n".join(codigo)
+    
+class NodoConstante(NodoAST):
+    def __init__(self, tipo, nombre, valor):
+        self.tipo = tipo
+        self.nombre = nombre
+        self.valor = valor
+        
+    def traducir(self):
+        return f"const {self.tipo} {self.nombre} = {self.valor[1]};"
+        
+    def generar_codigo(self):
+        return f"    {self.nombre} dd {self.valor[1]} ; constante {self.tipo}"
     

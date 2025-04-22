@@ -8,9 +8,9 @@ from semantico import *
 # === Analisis Lexico ===
 # Definir los patrones para los diferentes tipos de tokens
 token_patron = {
-    "KEYWORD": r'\b(if|else|while|switch|case|return|print|break|for|int|float|void|double|char)\b',
+    "KEYWORD": r'\b(if|else|while|switch|case|return|print|break|for|int|float|void|double|char|const)\b',
     "IDENTIFIER": r'\b[a-zA-Z_][a-zA-Z0-9_]*\b',
-    "NUMBER": r'\b\d+(\.\d+)?\b',
+    "NUMBER": r'\b\d+(\.\d+)?f?\b',
     "OPERATOR": r'[\+\-\*\/\=\<\>\!\_]',
     "DELIMITER": r'[(),;{}]',
     "WHITESPACE": r'\s+',
@@ -165,6 +165,8 @@ class Parser:
             if token_actual[0] == 'KEYWORD':
                 if token_actual[1] == 'if':
                     instrucciones.append(self.bucle_if())
+                elif token_actual[1] == 'const':
+                    instrucciones.append(self.declaracion_constante())  # Metodo para constante
                 elif token_actual[1] == 'print':
                     instrucciones.append(self.printf_llamada())
                 elif token_actual[1] == 'return':
@@ -210,6 +212,25 @@ class Parser:
 
         return instrucciones
 
+    def declaracion_constante(self):
+        self.coincidir('KEYWORD')  # Consumir 'const'
+        tipo = self.coincidir('KEYWORD')  # Tipo de dato (ej. 'float')
+        nombre = self.coincidir('IDENTIFIER')  # Nombre de la constante
+        
+        self.coincidir('OPERATOR')  # Consumir '='
+        
+        # Manejar el valor de la constante
+        if self.obtener_token_actual()[0] == 'NUMBER':
+            valor = self.coincidir('NUMBER')
+        elif self.obtener_token_actual()[0] == 'IDENTIFIER':
+            valor = self.coincidir('IDENTIFIER')
+        else:
+            raise SyntaxError(f'Error sintactico: Valor no válido para constante {nombre}')
+        
+        self.coincidir('DELIMITER')  # Consumir ';'
+        
+        return NodoConstante(tipo[1], nombre[1], valor)
+    
     def expresion_ing(self):
         izquierda = self.termino()  # Obtener el primer termino
         while self.obtener_token_actual() and self.obtener_token_actual()[0] == 'OPERATOR':
@@ -525,6 +546,60 @@ def imprimir_ast(nodo):
             "LlamadaFuncion": nodo.nombre,
             "Argumentos": [imprimir_ast(arg) for arg in nodo.argumentos]
         }
+    elif isinstance(nodo, NodoConstante):  # Nuevo caso para constantes
+        return {
+            "Constante": {
+                "Nombre": nodo.nombre,
+                "Tipo": nodo.tipo,
+                "Valor": nodo.valor[1] if isinstance(nodo.valor, tuple) else nodo.valor
+            }
+        }
+    elif isinstance(nodo, NodoWhile):
+        return {
+            "While": {
+                "Condicion": imprimir_ast(nodo.condicion),
+                "Cuerpo": [imprimir_ast(c) for c in nodo.cuerpo]
+            }
+        }
+    elif isinstance(nodo, NodoFor):
+        return {
+            "For": {
+                "Inicializacion": imprimir_ast(nodo.inicializacion),
+                "Condicion": imprimir_ast(nodo.condicion),
+                "Incremento": imprimir_ast(nodo.incremento),
+                "Cuerpo": [imprimir_ast(c) for c in nodo.cuerpo]
+            }
+        }
+    elif isinstance(nodo, NodoIf):
+        return {
+            "If": {
+                "Condicion": imprimir_ast(nodo.condicion),
+                "CuerpoIf": [imprimir_ast(c) for c in nodo.cuerpo_if],
+                "ElseIfs": [
+                    {
+                        "Condicion": imprimir_ast(cond),
+                        "Cuerpo": [imprimir_ast(c) for c in cuerpo]
+                    } for cond, cuerpo in nodo.else_ifs
+                ] if nodo.else_ifs else None,
+                "CuerpoElse": [imprimir_ast(c) for c in nodo.cuerpo_else] if nodo.cuerpo_else else None
+            }
+        }
+    elif isinstance(nodo, NodoIncremento):
+        return {
+            "Incremento": {
+                "Variable": nodo.variable,
+                "Tipo": nodo.tipo,
+                "Valor": imprimir_ast(nodo.valor) if nodo.valor else None
+            }
+        }
+    elif isinstance(nodo, NodoComparacion):
+        return {
+            "Comparacion": {
+                "Izquierda": imprimir_ast(nodo.izquierda),
+                "Operador": nodo.operador,
+                "Derecha": imprimir_ast(nodo.derecha)
+            }
+        }
     return {}
 
 def guardar_archivo(codigo_ensamblador, nombre_archivo="programa.s"):
@@ -538,22 +613,37 @@ def guardar_archivo(codigo_ensamblador, nombre_archivo="programa.s"):
         nombre_archivo (str): Nombre del archivo de salida (por defecto "programa.s").
     """
     # Encabezado con las declaraciones basicas para MinGW
-    encabezado = """section .data
-    x          dd 0     ; Define 'x' como entero de 32 bits
-    valor      dd 0     ; Define 'valor'
-    i          dd 0     ; Define 'i'
-    resultado  dd 0     ; Define 'resultado'
+    encabezado = """
+    section .data
+        ; Variables enteras (32 bits)
+        x          dd 0       ; Define 'x' como entero de 32 bits
+        valor      dd 0       ; Define 'valor'
+        i          dd 0       ; Define 'i'
+        resultado  dd 0       ; Define 'resultado'
+        
+        ; Constantes flotantes (32 bits)
+        pi         dd 3.14159 ; Define 'pi' como float (32 bits)
+        diametro   dd 8.0     ; Define 'diametro' como float
+        
+        ; Variables flotantes (32 bits)
+        circunferencia dd 0.0 ; Variable para el resultado flotante
 
-section .text
-    global _condicional  ; Hace visible la función 'condicional'
-    global _main        ; Hace visible la función 'main' (con _ para MinGW)
+    section .bss
+        ; Este espacio es para inicializar variables en caso de necesidad
 
-"""
+    section .text
+        global _condicional   ; Hace visible la funcion 'condicional'
+        global _calcular_circunferencia ; Funcion flotante
+        global _main          ; Hace visible la funcion 'main' (con _ para MinGW)
+
+    """
 
     # Reemplazar 'main' por '_main' y 'condicional' por '_condicional' en el código generado
     codigo_adaptado = codigo_ensamblador.replace('main:', '_main:')
     codigo_adaptado = codigo_adaptado.replace('condicional:', '_condicional:')
     codigo_adaptado = codigo_adaptado.replace('call condicional', 'call _condicional')
+    codigo_adaptado = codigo_adaptado.replace('calcular_circunferencia:', 'calcular_circunferencia')
+    codigo_adaptado = codigo_adaptado.replace('call calcular_circunferencia', 'call _calcular_circunferencia')
 
     try:
         with open(nombre_archivo, "w") as archivo:

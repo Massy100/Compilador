@@ -137,18 +137,18 @@ class AnalizadorSemantico:
 
 class TablaSimbolos:
     def __init__(self):
-        self.variables = {}  # {nombre: tipo}
+        self.variables = {}  # {nombre: (tipo, es_constante)}
         self.funciones = {}  # {nombre: (tipo_retorno, [tipos_parametros])}
         
-    def declarar_variable(self, nombre, tipo):
+    def declarar_variable(self, nombre, tipo, es_constante=False):
         if nombre in self.variables:
             raise Exception(f'Error semantico: la variable {nombre} ya esta declarada')
-        self.variables[nombre] = tipo
+        self.variables[nombre] = (tipo, es_constante)
         
     def obtener_tipo_variable(self, nombre):
         if nombre not in self.variables:
             raise Exception(f'Error semantico: la variable {nombre} no esta declarada')
-        return self.variables[nombre]
+        return self.variables[nombre][0]  # Devuelve solo el tipo
         
     def declarar_funcion(self, nombre, tipo_retorno, parametros):
         if nombre in self.funciones:
