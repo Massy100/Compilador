@@ -219,19 +219,21 @@ class NodoLlamadaFuncion(NodoAST):
         return f"{self.nombre}({params})"
     
     def generar_codigo(self):
-        # Generar codigo para empujar argumentos a la pila (en orden inverso)
         codigo = []
-        for arg in reversed(self.argumentos):
-            codigo.append(arg.generar_codigo())
-            codigo.append("    push eax")
-        
-        # Llamar a la funcion
-        codigo.append(f"    call {self.nombre}")
-        
-        # Limpiar los argumentos de la pila (si es necesario)
-        if self.argumentos:
-            codigo.append(f"    add esp, {4*len(self.argumentos)}")
-        
+        if self.nombre in ['printf', 'scanf']:
+            # Argumentos en orden inverso (excepto el primero para printf)
+            for arg in reversed(self.argumentos):
+                codigo.append(arg.generar_codigo())
+                codigo.append("    push eax")
+            
+            # Llamada a la función
+            codigo.append(f"    call _{self.nombre}")
+            
+            # Limpiar la pila
+            if self.argumentos:
+                codigo.append(f"    add esp, {4 * len(self.argumentos)}")
+        else:
+            ...
         return "\n".join(codigo)
         
 class NodoPrograma(NodoAST):
@@ -270,7 +272,7 @@ class NodoDeclaracion(NodoAST):
         return f"{self.tipo} {self.nombre};"
         
     def generar_codigo(self):
-        return f"; Declaración de variable: {self.tipo} {self.nombre}"
+        return f"; Declaracion de variable: {self.tipo} {self.nombre}"
 class NodoWhile(NodoAST):
     def __init__(self, condicion, cuerpo):
         self.condicion = condicion

@@ -1,3 +1,4 @@
+#include <stdio.h>
 int condicional(int x) {
     if (x > 0) {
         return 1;
@@ -13,7 +14,17 @@ float calcular_circunferencia(float diametro) {
     return pi * diametro;
 }
 
+void pedir() {
+    int numero;
+    
+    printf("Por favor, ingresa un numero entero: ");
+    scanf("%d", &numero);
+    
+    printf("El numero que ingresaste es: %d\n", numero);
+}
+
 int main() {
+    pedir();
     int valor = 5;
     int diametro_entero = 8;
     

@@ -8,7 +8,10 @@ from semantico import *
 # === Analisis Lexico ===
 # Definir los patrones para los diferentes tipos de tokens
 token_patron = {
+    "PREPROCESSOR": r'\#include\b',  
+    "HEADER": r'<[a-zA-Z0-9_.]+>',  
     "KEYWORD": r'\b(if|else|while|switch|case|return|print|break|for|int|float|void|double|char|const)\b',
+    "LIB_FUNCTION": r'\b(printf|scanf)\b',
     "IDENTIFIER": r'\b[a-zA-Z_][a-zA-Z0-9_]*\b',
     "NUMBER": r'\b\d+(\.\d+)?f?\b',
     "OPERATOR": r'[\+\-\*\/\=\<\>\!\_]',
@@ -50,6 +53,12 @@ class Parser:
         # Punto de entrada del analizador sintactico: se espera una o mas funciones
         funciones = []
         while self.pos < len(self.tokens):
+            token_actual = self.obtener_token_actual()
+            # Saltar #include <stdio.h>
+            if token_actual and token_actual[0] == 'PREPROCESSOR':
+                self.pos += 1  # Consumir #include
+                self.coincidir('HEADER')  # Consumir <stdio.h>
+                continue
             funcion = self.funcion()
             funciones.append(funcion)
 
@@ -65,12 +74,16 @@ class Parser:
         return NodoPrograma(funciones)  # Devolver un nodo Programa
     
     def llamada_funcion(self):
-        """Procesa una llamada a funcion, como `suma(4, 3)` o `condicional(valor)`."""
-        nombre_funcion = self.coincidir('IDENTIFIER')
-        self.coincidir('DELIMITER')  # Consumir '('
+        """Procesa llamadas a funciones normales y de librería (printf/scanf)"""
+        if self.obtener_token_actual()[0] in ['IDENTIFIER', 'LIB_FUNCTION']:
+            nombre_funcion = self.coincidir(self.obtener_token_actual()[0])
+        else:
+            raise SyntaxError(f"Se esperaba IDENTIFIER o LIB_FUNCTION, se encontro {self.obtener_token_actual()}")
+        
+        self.coincidir('DELIMITER')  # '('
         argumentos = self.argumentos()
-        self.coincidir('DELIMITER')  # Consumir ')'
-
+        self.coincidir('DELIMITER')  # ')'
+        
         return NodoLlamadaFuncion(nombre_funcion[1], argumentos)
     
     def argumentos(self):
@@ -206,6 +219,9 @@ class Parser:
             elif token_actual[0] in ['NUMBER', 'STRING']:
                 instrucciones.append(self.expresion_ing())
                 self.coincidir('DELIMITER')
+                
+            elif token_actual[0] == 'LIB_FUNCTION':  
+                instrucciones.append(self.llamada_funcion())
 
             else:
                 raise SyntaxError(f'Error sintactico: se esperaba una declaracion valida, pero se encontro: {token_actual}')
@@ -325,46 +341,64 @@ class Parser:
 
     def expresion_logica(self):
         """
-        Analiza expresiones logicas y devuelve un NodoComparacion.
+        Analiza expresiones lógicas y devuelve un NodoComparacion.
+        Maneja: 
+        - Operadores de comparación: >, <, >=, <=, ==, !=
+        - Números negativos (ej: -5 < 0)
+        - Identificadores y números como operandos
         """
-        izquierda = None
-        operador = None
-        derecha = None
-        
-        # Manejar signo negativo si existe
-        negativo = False
+        # Manejar signo negativo para el operando izquierdo
+        negativo_izq = False
         if self.obtener_token_actual()[0] == 'OPERATOR' and self.obtener_token_actual()[1] == '-':
-            negativo = True
-            self.coincidir('OPERATOR')
-        
-        # Obtener el operando izquierdo
+            self.coincidir('OPERATOR')  # Consumir el '-'
+            negativo_izq = True
+
+        # Obtener operando izquierdo
         if self.obtener_token_actual()[0] == 'IDENTIFIER':
             izquierda = NodoIdentificador(self.coincidir('IDENTIFIER'))
         elif self.obtener_token_actual()[0] == 'NUMBER':
             num = self.coincidir('NUMBER')
-            if negativo:
-                izquierda = NodoNumero(('NUMBER', '-' + num[1]))
-                negativo = False
-            else:
-                izquierda = NodoNumero(num)
+            izquierda = NodoNumero(('NUMBER', f"-{num[1]}" if negativo_izq else num[1]))
         else:
-            raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER o NUMBER, pero se encontro {self.obtener_token_actual()}")
+            raise SyntaxError(
+                f"Error sintáctico en expresión lógica: "
+                f"Se esperaba IDENTIFIER o NUMBER, pero se encontró {self.obtener_token_actual()}"
+            )
 
-        # Obtener el operador
+        # Obtener operador (simple o compuesto)
         operador = self.coincidir('OPERATOR')[1]
         
         # Manejar operadores compuestos (==, !=, >=, <=)
         if self.obtener_token_actual()[0] == 'OPERATOR':
-            segundo_op = self.coincidir('OPERATOR')[1]
-            operador += segundo_op
-        
-        # Obtener el operando derecho
+            posible_op_compuesto = operador + self.obtener_token_actual()[1]
+            if posible_op_compuesto in ['==', '!=', '>=', '<=']:
+                operador += self.coincidir('OPERATOR')[1]
+
+        # Manejar signo negativo para el operando derecho
+        negativo_der = False
+        if self.obtener_token_actual()[0] == 'OPERATOR' and self.obtener_token_actual()[1] == '-':
+            self.coincidir('OPERATOR')
+            negativo_der = True
+
+        # Obtener operando derecho
         if self.obtener_token_actual()[0] == 'IDENTIFIER':
             derecha = NodoIdentificador(self.coincidir('IDENTIFIER'))
         elif self.obtener_token_actual()[0] == 'NUMBER':
-            derecha = NodoNumero(self.coincidir('NUMBER'))
+            num = self.coincidir('NUMBER')
+            derecha = NodoNumero(('NUMBER', f"-{num[1]}" if negativo_der else num[1]))
         else:
-            raise SyntaxError(f"Error sintactico: Se esperaba IDENTIFIER o NUMBER, pero se encontro {self.obtener_token_actual()}")
+            raise SyntaxError(
+                f"Error sintáctico en expresión lógica: "
+                f"Se esperaba IDENTIFIER o NUMBER después del operador, pero se encontró {self.obtener_token_actual()}"
+            )
+
+        # Validar operador permitido
+        operadores_permitidos = ['>', '<', '>=', '<=', '==', '!=']
+        if operador not in operadores_permitidos:
+            raise SyntaxError(
+                f"Error sintáctico: Operador de comparación no válido '{operador}'. "
+                f"Operadores permitidos: {', '.join(operadores_permitidos)}"
+            )
 
         return NodoComparacion(izquierda, operador, derecha)
 
