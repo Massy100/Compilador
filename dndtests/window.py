@@ -3,7 +3,7 @@ from tkinter import ttk
 
 import re
 
-texto = ["Cursor", "B", "C", "D", "E", "F", "Ovalo", "Rectangulo", "I", "J"]
+btnTxts = ["Cursor", "Proceso", "Condición", "Entrada/Salida", "Llamada a Función", "Terminal"]
 
 token_patron = {
     "PREPROCESSOR": r'\#include\b',  
@@ -57,8 +57,8 @@ class Window:
         self.canvas.rowconfigure(0, weight=1)
 
         self.elements_frame.columnconfigure(0, weight=1)
-        for i in range(10):
-            btn = Button(self.elements_frame, text=texto[i], command=lambda i=i: self.canvas_mode(texto[i]))
+        for i in range(len(btnTxts)):
+            btn = Button(self.elements_frame, text=btnTxts[i], command=lambda i=i: self.canvas_mode(btnTxts[i]))
             btn.grid(row=i, column=0, sticky="ew")
             self.elements_frame.rowconfigure(i, weight=1)
 
@@ -73,19 +73,41 @@ class Window:
         if self.selection_mode:
             return
         else:
-            tag = f"shape{len(self.shapes)}"
+            if self.current_element == "Proceso":
+                tag = f"sent_{len(self.shapes)}"
+                shape = self.canvas.create_rectangle(e.x-50, e.y-25, e.x + 50, e.y + 25, fill="grey", tags=tag, outline="")    
+            elif self.current_element == "Condición":
+                tag = f"cond_{len(self.shapes)}"
+                shape = self.canvas.create_polygon([(e.x, e.y+25), (e.x+50, e.y), (e.x, e.y-25),(e.x-50, e.y)], fill="grey", tags=tag)
+            elif self.current_element == "Entrada/Salida":
+                tag = f"io_{len(self.shapes)}"
+                shape = self.canvas.create_polygon([(e.x-50 , e.y-25), (e.x+100, e.y-25), (e.x+50, e.y+25), (e.x-100,e.y+25)], fill="grey", tags=tag)
+            elif self.current_element == "Llamada a Función":
+                tag = f"func_{len(self.shapes)}"
+                shape = self.canvas.create_rectangle(e.x-50, e.y-25, e.x + 50, e.y + 25, fill="grey", tags=tag, outline="")
+                self.canvas.create_line(e.x-40, e.y-25, e.x - 40, e.y + 25, fill="black", width=1, tags=tag)
+                self.canvas.create_line(e.x+40, e.y-25, e.x + 40, e.y + 25, fill="black", width=1, tags=tag)
+            elif self.current_element == "Terminal":
+                tag = f"terminal_{len(self.shapes)}"
+                points = [
+                    (e.x-30 , e.y), 
+                    (e.x-20 , e.y-12),
+                    (e.x , e.y-12),
+                    (e.x+20, e.y-12),
+                    (e.x+30, e.y),
+                    (e.x+20,e.y+12),
+                    (e.x , e.y+12),
+                    (e.x-20,e.y+12)
+                    
+                ]
+                shape = self.canvas.create_polygon(points, fill="grey", tags=tag, smooth=True, )
+                
             tag_text = f"{tag}_text"
-            if self.current_element == "Ovalo":
-                shape = self.canvas.create_oval(e.x-25, e.y-25, e.x + 25, e.y + 25, fill="blue", tags=tag)
-            elif self.current_element == "Rectangulo":
-                shape = self.canvas.create_rectangle(e.x-25, e.y-25, e.x + 25, e.y + 25, fill="green", tags=tag)    
-            
-            self.shapes.append(shape) 
-            self.canvas.tag_bind(shape, "<Double-Button-1>", lambda e: self.shape_addText( tag_text))
-            self.canvas.tag_bind(shape, "<Button-1>", lambda e: self.canvas.itemconfig(shape, fill="red"))
-            x1, y1, x2, y2 = self.canvas.coords(shape)
-            text = self.canvas.create_text((x2+x1)/2, (y2+y1)/2, text="", fill="black", tags=tag_text)
-            self.canvas.lift(text, shape)
+            self.shapes.append(tag) 
+            self.canvas.tag_bind(tag, "<Double-Button-1>", lambda e: self.shape_addText( tag_text))
+            self.canvas.tag_bind(tag, "<Button-1>", lambda e: self.canvas.itemconfig(shape, fill="red"))
+            text = self.canvas.create_text(e.x, e.y, text="", fill="black", tags=tag_text)
+            self.canvas.lift(text, tag)
             self.texts.append(text)
 
     def shape_addText(self, tag):
@@ -128,11 +150,11 @@ class Window:
         txtid.grid(row=0, column=1, sticky="ew")
         txtid.bind("<Return>", lambda e: dismiss())
 
-        return typeVar.get() + " " + idVar.get() + ";"
-
-
         dlg.protocol("WM_DELETE_WINDOW",  dismiss)
         dlg.transient(root)
+
+        return typeVar.get() + " " + idVar.get() + ";"
+
 
     def assign_dlg(self):
         sentence = ""
