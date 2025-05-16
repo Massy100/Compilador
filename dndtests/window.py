@@ -41,6 +41,9 @@ class Window:
         self.check_string_wrapper = (self.root.register(self.check_string), '%P')
         self.check_value_wrapper = (self.root.register(self.check_value), '%P')
 
+        self.lastx = 0
+        self.lasty = 0
+
     def create_frames(self):
         self.canvas_frame = Frame(self.root)
         self.canvas_frame.grid(row=1, column=1, sticky="nsew")
@@ -73,6 +76,7 @@ class Window:
         if self.selection_mode:
             return
         else:
+            text_function = lambda e: self.shape_addText( tag_text)
             if self.current_element == "Proceso":
                 tag = f"sent_{len(self.shapes)}"
                 shape = self.canvas.create_rectangle(e.x-50, e.y-25, e.x + 50, e.y + 25, fill="grey", tags=tag, outline="")    
@@ -104,11 +108,23 @@ class Window:
                 
             tag_text = f"{tag}_text"
             self.shapes.append(tag) 
-            self.canvas.tag_bind(tag, "<Double-Button-1>", lambda e: self.shape_addText( tag_text))
-            self.canvas.tag_bind(tag, "<Button-1>", lambda e: self.canvas.itemconfig(shape, fill="red"))
+            
+            self.canvas.tag_bind(tag, "<Double-Button-1>", text_function)
+            self.canvas.tag_bind(shape, "<1>", lambda e: self.savePosn(e))
+            self.canvas.tag_bind(tag, "<ButtonRelease-1>", lambda e: self.move_shape(e, tag))
+                     
+            
             text = self.canvas.create_text(e.x, e.y, text="", fill="black", tags=tag_text)
             self.canvas.lift(text, tag)
             self.texts.append(text)
+
+    def savePosn(self, e):
+        self.lastx, self.lasty = e.x, e.y
+
+    def move_shape(self, event, tag):
+        self.canvas.move(tag, event.x - self.lastx, event.y - self.lasty)
+
+
 
     def shape_addText(self, tag):
         self.canvas.itemconfig(tag, text=self.assign_dlg()) 
