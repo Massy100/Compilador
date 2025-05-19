@@ -3,7 +3,7 @@ from tkinter import ttk
 
 import re
 
-btnTxts = ["Cursor", "Proceso", "Condición", "Entrada/Salida", "Llamada a Función", "Terminal"]
+btnTxts = ["Cursor", "Conexión", "Proceso", "Condición", "Entrada/Salida", "Llamada a Función", "Terminal"]
 
 token_patron = {
     "PREPROCESSOR": r'\#include\b',  
@@ -18,6 +18,10 @@ token_patron = {
     "STRING": r'"[^"]*"',  
 }
 
+value_pattern = f"(?:(?:{token_patron['IDENTIFIER']}|{token_patron['NUMBER']}|{token_patron['STRING']})(?: *[-+*/] *)?)+" 
+logical_pattern = fr"(?:(?:{token_patron['IDENTIFIER']}|{token_patron['NUMBER']}|{token_patron['STRING']})(?: *(?:==|<|>|<=|>=|!|&&|\|\|) *)?)+" 
+parameter_pattern = f"(?:(?:{token_patron['IDENTIFIER']}|{token_patron['NUMBER']}|{token_patron['STRING']})(?:, *)?)+"
+
 class Window:
     def __init__(self, root:Tk):
         self.root = root
@@ -31,7 +35,8 @@ class Window:
         self.shapes = []
         self.texts = []
 
-        self.selection_mode = True
+        self.selection_mode = True 
+        self.connection_mode = True 
 
         self.create_frames()
         self.fill_frames()
@@ -40,6 +45,8 @@ class Window:
         self.check_number_wrapper = (self.root.register(self.check_num), '%P')
         self.check_string_wrapper = (self.root.register(self.check_string), '%P')
         self.check_value_wrapper = (self.root.register(self.check_value), '%P')
+        self.check_condition_wrapper = (self.root.register(self.check_condition), '%P')
+        self.check_param_wrapper = (self.root.register(self.check_param), '%P')
 
         self.lastx = 0
         self.lasty = 0
@@ -69,6 +76,7 @@ class Window:
     
     def canvas_mode(self, text):
         self.selection_mode = text == "Cursor"
+        self.conecction_mode = text == "Conexión"
         self.current_element = text
         print(self.current_element)    
 
@@ -76,21 +84,24 @@ class Window:
         if self.selection_mode:
             return
         else:
-            text_function = lambda e: self.shape_addText( tag_text)
             if self.current_element == "Proceso":
                 tag = f"sent_{len(self.shapes)}"
-                shape = self.canvas.create_rectangle(e.x-50, e.y-25, e.x + 50, e.y + 25, fill="grey", tags=tag, outline="")    
+                shape = self.canvas.create_rectangle(e.x-50, e.y-25, e.x + 50, e.y + 25, fill="grey", tags=tag, outline="")  
+                textFunction = 0  
             elif self.current_element == "Condición":
                 tag = f"cond_{len(self.shapes)}"
                 shape = self.canvas.create_polygon([(e.x, e.y+25), (e.x+50, e.y), (e.x, e.y-25),(e.x-50, e.y)], fill="grey", tags=tag)
+                textFunction = 1
             elif self.current_element == "Entrada/Salida":
                 tag = f"io_{len(self.shapes)}"
                 shape = self.canvas.create_polygon([(e.x-50 , e.y-25), (e.x+100, e.y-25), (e.x+50, e.y+25), (e.x-100,e.y+25)], fill="grey", tags=tag)
+                textFunction = 2
             elif self.current_element == "Llamada a Función":
                 tag = f"func_{len(self.shapes)}"
                 shape = self.canvas.create_rectangle(e.x-50, e.y-25, e.x + 50, e.y + 25, fill="grey", tags=tag, outline="")
                 self.canvas.create_line(e.x-40, e.y-25, e.x - 40, e.y + 25, fill="black", width=1, tags=tag)
                 self.canvas.create_line(e.x+40, e.y-25, e.x + 40, e.y + 25, fill="black", width=1, tags=tag)
+                textFunction = 3
             elif self.current_element == "Terminal":
                 tag = f"terminal_{len(self.shapes)}"
                 points = [
@@ -105,14 +116,15 @@ class Window:
                     
                 ]
                 shape = self.canvas.create_polygon(points, fill="grey", tags=tag, smooth=True, )
+                textFunction = 4
+            addText_bind = lambda e: self.shape_addText(tag_text, self.dlg(textFunction))
                 
             tag_text = f"{tag}_text"
             self.shapes.append(tag) 
             
-            self.canvas.tag_bind(tag, "<Double-Button-1>", text_function)
+            self.canvas.tag_bind(tag, "<Double-Button-1>", addText_bind)
             self.canvas.tag_bind(shape, "<1>", lambda e: self.savePosn(e))
             self.canvas.tag_bind(tag, "<ButtonRelease-1>", lambda e: self.move_shape(e, tag))
-                     
             
             text = self.canvas.create_text(e.x, e.y, text="", fill="black", tags=tag_text)
             self.canvas.lift(text, tag)
@@ -123,11 +135,11 @@ class Window:
 
     def move_shape(self, event, tag):
         self.canvas.move(tag, event.x - self.lastx, event.y - self.lasty)
+        self.canvas.move(tag+"_text", event.x - self.lastx, event.y - self.lasty)
 
-
-
-    def shape_addText(self, tag):
-        self.canvas.itemconfig(tag, text=self.assign_dlg()) 
+    def shape_addText(self, tag, text=""):
+        print(text)
+        self.canvas.itemconfig(tag, text=text) 
         print(self.canvas.itemcget(tag, "text")) 
 
     def check_identifier(self, newval, action, index):
@@ -144,69 +156,132 @@ class Window:
         # Check if the new value matches the pattern
         return re.fullmatch(token_patron["STRING"], newval) is not None
     
-    def check_value(self, newval):
+    def check_value(self, newval:str):
         # Check if the new value matches the pattern
-        return re.fullmatch("[^?!\n]*", newval) is not None
+        if newval == "":
+            return True
+        if newval.endswith(("+", "-", "*", "/")):
+            return False
+        return re.fullmatch(value_pattern, newval) is not None
 
-    def declare_dlg(self):
+    def check_condition(self, newval:str):
+        # Check if the new value matches the pattern
+        if newval.endswith(("&&", "||", "==", "<", ">", "<=", ">=", "!")):
+            return False
+        return re.fullmatch(logical_pattern, newval) is not None
+    
+    def check_param(self, newval:str):
+        # Check if the new value matches the pattern
+        if newval.endswith(","):
+            return False
+        return re.fullmatch(parameter_pattern, newval) is not None
 
+    def dlg(self, type:int):
         def dismiss():
+            for widget in dlg.winfo_children():
+                if isinstance(widget, ttk.Entry):
+                    if not widget.validate():
+                        widget.focus_set()
+                        return
             dlg.grab_release()
             dlg.destroy()
 
         dlg = Toplevel(self.root)
+        result = ""
+        match type:
+            case 0:
+                typeVar = StringVar()
+                types = ["","int", "float", "char", "double"]
+                commboType = ttk.Combobox(dlg,textvariable=typeVar, values=types, state="readonly")
+                commboType.grid(row=0, column=0, sticky="ew")
+                commboType.focus_set()
+                
+                idVar = StringVar()
+                txtid = ttk.Entry(dlg, textvariable=idVar, validatecommand=self.check_identifier_wrapper)
+                txtid.grid(row=0, column=1, sticky="ew")
 
-        typeVar = StringVar()
-        commboType = ttk.Combobox(dlg, textvariable=typeVar, values=["int", "float", "char", "double"], state="readonly")
-        commboType.grid(row=0, column=0, sticky="ew")
-        commboType.focus_set()
+                lbl = ttk.Label(dlg, text="=")
+                lbl.grid(row=0, column=2, sticky="ew")
 
-        idVar = StringVar()
-        txtid = ttk.Entry(dlg, textvariable=idVar, validate='key', validatecommand=self.check_identifier_wrapper)
-        txtid.grid(row=0, column=1, sticky="ew")
-        txtid.bind("<Return>", lambda e: dismiss())
+                valueVar = StringVar()
+                txtvalue = ttk.Entry(dlg, textvariable=valueVar, validatecommand=self.check_value_wrapper)
+                txtvalue.grid(row=0, column=3, sticky="ew")
+                
+                
+            case 1:
+                title = "Condición"
+                
+                conditionVar = StringVar()
+                txtcondition = ttk.Entry(dlg, textvariable=conditionVar, validatecommand=self.check_condition_wrapper)
+                txtcondition.grid(row=0, column=0, sticky="ew")
+                txtcondition.focus_set()
+
+            case 2:
+                title = "Entrada/Salida"
+
+                lblMsg = ttk.Label(dlg, text="Mensaje entre comillas")
+                lblMsg.grid(row=0, column=0, sticky="ew")
+
+                msgVar = StringVar()
+                txtmsg = ttk.Entry(dlg, textvariable=msgVar, validatecommand=self.check_string_wrapper)
+                txtmsg.grid(row=0, column=1, sticky="ew")
+                txtmsg.focus_set()
+
+                typeVar = StringVar()
+                types = ["Escribir", "Leer"]
+                commboType = ttk.Combobox(dlg,textvariable=typeVar, values=types, state="readonly")
+                commboType.grid(row=1, column=0, sticky="ew")
+
+                idVar = StringVar()
+                txtid = ttk.Entry(dlg, textvariable=idVar, validatecommand=self.check_identifier_wrapper)
+                txtid.grid(row=1, column=1, sticky="ew")
+                
+            case 3:
+                title = "Función"
+                lblCall = ttk.Label(dlg, text="Función")
+                lblCall.grid(row=0, column=0, sticky="ew")
+
+                idVar = StringVar()
+                txtid = ttk.Entry(dlg, textvariable=idVar, validatecommand=self.check_identifier_wrapper)
+                txtid.grid(row=0, column=1, sticky="ew")
+                txtid.focus_set()
+
+                lblParam = ttk.Label(dlg, text="Parámetros")
+                lblParam.grid(row=1, column=0, sticky="ew")
+                paramVar = StringVar()
+                txtparam = ttk.Entry(dlg, textvariable=paramVar, validatecommand=self.check_param_wrapper)
+                txtparam.grid(row=1, column=1, sticky="ew")
+
+            case 4:
+                title = "Terminal"
+                idVar = StringVar()
+                txtid = ttk.Entry(dlg, textvariable=idVar, validatecommand=self.check_identifier_wrapper)
+                txtid.grid(row=0, column=0, sticky="ew")
+                txtid.focus_set()
+
+        doneBtn = ttk.Button(dlg, text="Done", command=dismiss)
+        doneBtn.grid(row=2, column=0, columnspan=4, sticky="ew")
+        doneBtn.columnconfigure(0, weight=5)
+        dlg.rowconfigure(1, weight=5)
 
         dlg.protocol("WM_DELETE_WINDOW",  dismiss)
         dlg.transient(root)
+        dlg.wait_visibility() 
+        dlg.grab_set()        
+        dlg.wait_window()
 
-        return typeVar.get() + " " + idVar.get() + ";"
-
-
-    def assign_dlg(self):
-        sentence = ""
-        def dismiss():
-            dlg.grab_release()
-            dlg.destroy()
-
-        dlg = Toplevel(self.root)
-
-        typeVar = StringVar()
-        commboType = ttk.Combobox(dlg, textvariable=typeVar, values=["int", "float", "char", "double"], state="readonly")
-        commboType.grid(row=0, column=0, sticky="ew")
-        commboType.focus_set()
-
-
-        lbl = ttk.Label(dlg, text=" = ")
-        lbl.grid(row=0, column=2, sticky="ew")
-
-        idVar = StringVar()
-        txtid = ttk.Entry(dlg, textvariable=idVar, validate='key', validatecommand=self.check_identifier_wrapper)
-        txtid.grid(row=0, column=1, sticky="ew")
-
-        valVar = StringVar()
-        txtval = ttk.Entry(dlg, textvariable=valVar, validate='key', validatecommand=self.check_value_wrapper)
-        txtval.grid(row=0, column=3, sticky="ew")
-        txtval.bind("<Return>", lambda e: dismiss())
-
-        dlg.protocol("WM_DELETE_WINDOW",  dismiss)
-        dlg.transient(root)   # dialog window is related to main
-        dlg.wait_visibility() # can't grab until window appears, so we wait
-        dlg.grab_set()        # ensure all input goes to our window
-        dlg.wait_window()     # block until window is destroyed
-
-        return typeVar.get() + " " + idVar.get() + " = " + valVar.get() + ";"
-
-
+        match type:
+            case 0:
+                result = f"{typeVar.get()} {idVar.get()}{' = '+ valueVar.get() if valueVar.get() else ''};"
+            case 1:
+                result = f"{conditionVar.get()}"
+            case 2:
+                result = f"{msgVar.get()}\n{typeVar.get()} {idVar.get()}"
+            case 3:
+                result = f"{idVar.get()}({paramVar.get()});"
+            case 4:
+                result = f"{idVar.get()}"
+        return result
 
 if __name__ == "__main__":
     root = Tk()
