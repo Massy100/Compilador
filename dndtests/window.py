@@ -237,29 +237,23 @@ class Window:
             case 0:
                 typeVar = StringVar()
                 types = ["","int", "float", "char", "double"]
-                commboType = ttk.Combobox(dlg,textvariable=typeVar, values=types, state="readonly")
-                commboType.grid(row=0, column=0, sticky="ew")
-                commboType.focus_set()
+                addCombo(dlg, typeVar, types, 0, 0)
                 
                 idVar = StringVar()
-                txtid = ttk.Entry(dlg, textvariable=idVar, validatecommand=self.check_identifier_wrapper)
-                txtid.grid(row=0, column=1, sticky="ew")
+                addEntry(dlg, idVar, self.check_identifier_wrapper, 0, 1)
 
                 lbl = ttk.Label(dlg, text="=")
                 lbl.grid(row=0, column=2, sticky="ew")
 
                 valueVar = StringVar()
-                txtvalue = ttk.Entry(dlg, textvariable=valueVar, validatecommand=self.check_value_wrapper)
-                txtvalue.grid(row=0, column=3, sticky="ew")
-                
+                addEntry(dlg, valueVar, self.check_value_wrapper, 0, 3)
                 
             case 1:
                 title = "Condición"
                 
                 conditionVar = StringVar()
-                txtcondition = ttk.Entry(dlg, textvariable=conditionVar, validatecommand=self.check_condition_wrapper)
-                txtcondition.grid(row=0, column=0, sticky="ew")
-                txtcondition.focus_set()
+                txtCondition = addEntry(dlg, conditionVar, self.check_condition_wrapper, 0, 0)
+                txtCondition.focus_set()
 
             case 2:
                 title = "Entrada/Salida"
@@ -268,18 +262,15 @@ class Window:
                 lblMsg.grid(row=0, column=0, sticky="ew")
 
                 msgVar = StringVar()
-                txtmsg = ttk.Entry(dlg, textvariable=msgVar, validatecommand=self.check_string_wrapper)
-                txtmsg.grid(row=0, column=1, sticky="ew")
-                txtmsg.focus_set()
+                txtMsg = addEntry(dlg, msgVar, self.check_string_wrapper, 0, 1)
+                txtMsg.focus_set()
 
                 typeVar = StringVar()
                 types = ["Escribir", "Leer"]
-                commboType = ttk.Combobox(dlg,textvariable=typeVar, values=types, state="readonly")
-                commboType.grid(row=1, column=0, sticky="ew")
+                addCombo(dlg, typeVar, types, 1, 0)
 
                 idVar = StringVar()
-                txtid = ttk.Entry(dlg, textvariable=idVar, validatecommand=self.check_identifier_wrapper)
-                txtid.grid(row=1, column=1, sticky="ew")
+                addEntry(dlg, idVar, self.check_identifier_wrapper, 1, 1)
                 
             case 3:
                 title = "Función"
@@ -287,22 +278,21 @@ class Window:
                 lblCall.grid(row=0, column=0, sticky="ew")
 
                 idVar = StringVar()
-                txtid = ttk.Entry(dlg, textvariable=idVar, validatecommand=self.check_identifier_wrapper)
-                txtid.grid(row=0, column=1, sticky="ew")
-                txtid.focus_set()
+                txtId = addEntry(dlg, idVar, self.check_identifier_wrapper, 0, 1)
+                txtId.focus_set()
 
                 lblParam = ttk.Label(dlg, text="Parámetros")
                 lblParam.grid(row=1, column=0, sticky="ew")
+                
                 paramVar = StringVar()
-                txtparam = ttk.Entry(dlg, textvariable=paramVar, validatecommand=self.check_param_wrapper)
-                txtparam.grid(row=1, column=1, sticky="ew")
+                addEntry(dlg, paramVar, self.check_param_wrapper, 1, 1)
+                
 
             case 4:
                 title = "Terminal"
                 idVar = StringVar()
-                txtid = ttk.Entry(dlg, textvariable=idVar, validatecommand=self.check_identifier_wrapper)
-                txtid.grid(row=0, column=0, sticky="ew")
-                txtid.focus_set()
+                txtId = addEntry(dlg, idVar, self.check_identifier_wrapper, 0, 0)
+                txtId.focus_set()
 
         doneBtn = ttk.Button(dlg, text="Done", command=dismiss)
         doneBtn.grid(row=2, column=0, columnspan=4, sticky="ew")
@@ -327,6 +317,17 @@ class Window:
             case 4:
                 result = f"{idVar.get()}"
         return result
+    
+def addEntry(parent, trackVar, validateCommand, row, col):
+    entry = ttk.Entry(parent, textvariable=trackVar, validatecommand=validateCommand)
+    entry.grid(row=row, column=col, sticky="ew")
+    return entry
+
+def addCombo(parent, trackVar, values, row, col):
+    combo = ttk.Combobox(parent, textvariable=trackVar, values=values, state="readonly")
+    combo.grid(row=row, column=col, sticky="ew")
+    return combo
+
 
 if __name__ == "__main__":
     root = Tk()
