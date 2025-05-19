@@ -3,6 +3,9 @@ from tkinter import ttk
 
 import re
 
+shape_height = 25
+shape_width = 50
+
 btnTxts = ["Cursor", "Conexión", "Proceso", "Condición", "Entrada/Salida", "Llamada a Función", "Terminal"]
 
 token_patron = {
@@ -81,29 +84,29 @@ class Window:
         print(self.current_element)    
 
     def on_click(self, e):
-        if self.selection_mode:
+        if self.selection_mode or self.conecction_mode:
             return
         else:
             if self.current_element == "Proceso":
-                tag = f"sent_{len(self.shapes)}"
-                shape = self.canvas.create_rectangle(e.x-50, e.y-25, e.x + 50, e.y + 25, fill="grey", tags=tag, outline="")  
+                tag = f"sent{len(self.shapes)}"
+                shape = self.canvas.create_rectangle(e.x-shape_width, e.y-shape_height, e.x + shape_width, e.y + shape_height, fill="grey", tags=tag, outline="")  
                 textFunction = 0  
             elif self.current_element == "Condición":
-                tag = f"cond_{len(self.shapes)}"
-                shape = self.canvas.create_polygon([(e.x, e.y+25), (e.x+50, e.y), (e.x, e.y-25),(e.x-50, e.y)], fill="grey", tags=tag)
+                tag = f"cond{len(self.shapes)}"
+                shape = self.canvas.create_polygon([(e.x, e.y+shape_height), (e.x+shape_width, e.y), (e.x, e.y-shape_height),(e.x-shape_width, e.y)], fill="grey", tags=tag)
                 textFunction = 1
             elif self.current_element == "Entrada/Salida":
-                tag = f"io_{len(self.shapes)}"
-                shape = self.canvas.create_polygon([(e.x-50 , e.y-25), (e.x+100, e.y-25), (e.x+50, e.y+25), (e.x-100,e.y+25)], fill="grey", tags=tag)
+                tag = f"io{len(self.shapes)}"
+                shape = self.canvas.create_polygon([(e.x-shape_width , e.y-shape_height), (e.x+(2*shape_width), e.y-shape_height), (e.x+shape_width, e.y+shape_height), (e.x-(2*shape_width),e.y+shape_height)], fill="grey", tags=tag)
                 textFunction = 2
             elif self.current_element == "Llamada a Función":
-                tag = f"func_{len(self.shapes)}"
-                shape = self.canvas.create_rectangle(e.x-50, e.y-25, e.x + 50, e.y + 25, fill="grey", tags=tag, outline="")
-                self.canvas.create_line(e.x-40, e.y-25, e.x - 40, e.y + 25, fill="black", width=1, tags=tag)
-                self.canvas.create_line(e.x+40, e.y-25, e.x + 40, e.y + 25, fill="black", width=1, tags=tag)
+                tag = f"func{len(self.shapes)}"
+                shape = self.canvas.create_rectangle(e.x-shape_width, e.y-shape_height, e.x + shape_width, e.y + shape_height, fill="grey", tags=tag, outline="")
+                self.canvas.create_line(e.x-(shape_width-10), e.y-shape_height, e.x - (shape_width-10), e.y + shape_height, fill="black", width=1, tags=tag)
+                self.canvas.create_line(e.x+(shape_width-10), e.y-shape_height, e.x + (shape_width-10), e.y + shape_height, fill="black", width=1, tags=tag)
                 textFunction = 3
             elif self.current_element == "Terminal":
-                tag = f"terminal_{len(self.shapes)}"
+                tag = f"terminal{len(self.shapes)}"
                 points = [
                     (e.x-30 , e.y), 
                     (e.x-20 , e.y-12),
@@ -115,7 +118,7 @@ class Window:
                     (e.x-20,e.y+12)
                     
                 ]
-                shape = self.canvas.create_polygon(points, fill="grey", tags=tag, smooth=True, )
+                shape = self.canvas.create_polygon(points, fill="grey", tags=tag, smooth=True)
                 textFunction = 4
             addText_bind = lambda e: self.shape_addText(tag_text, self.dlg(textFunction))
                 
@@ -123,19 +126,61 @@ class Window:
             self.shapes.append(tag) 
             
             self.canvas.tag_bind(tag, "<Double-Button-1>", addText_bind)
-            self.canvas.tag_bind(shape, "<1>", lambda e: self.savePosn(e))
-            self.canvas.tag_bind(tag, "<ButtonRelease-1>", lambda e: self.move_shape(e, tag))
+            self.canvas.tag_bind(shape, "<1>", lambda e: self.savePosn(e, tag))
+            self.canvas.tag_bind(tag, "<ButtonRelease-1>", lambda e: self.release_btn(e, tag))
             
             text = self.canvas.create_text(e.x, e.y, text="", fill="black", tags=tag_text)
             self.canvas.lift(text, tag)
-            self.texts.append(text)
+            self.texts.append(text) 
 
-    def savePosn(self, e):
-        self.lastx, self.lasty = e.x, e.y
+    def savePosn(self, e, tag):
+        if self.selection_mode:
+            self.lastx, self.lasty = e.x, e.y
+        elif self.conecction_mode:
+            self.lastx, self.lasty = self.getCenter(tag)
+
+    def getCenter(self, tag):
+        coords = self.canvas.coords(tag)
+        x_cords = coords[::2]
+        y_cords = coords[1::2]
+
+        center_x = (max(x_cords) + min(x_cords)) / 2
+        center_y = (max(y_cords) + min(y_cords)) / 2
+
+        return center_x, center_y        
+
+    def release_btn(self, e, tag):
+        if self.selection_mode:
+            self.move_shape(e, tag)
+        elif self.conecction_mode:
+            self.connection(e, tag)
+    
+    def connection(self, e, tag):
+        secondTag = self.canvas.find_closest(e.x, e.y,start=tag+"_line")[0]
+        secondTag = self.canvas.gettags(secondTag)[0]
+        centerCoords = self.getCenter(secondTag)
+        self.canvas.create_line(self.lastx, self.lasty, centerCoords[0], centerCoords[1], fill="black", width=2, tags=[tag+"_line", secondTag+"_line", tag+"_"+secondTag])
+
+        self.canvas.tag_lower(tag +"_line")
+        self.canvas.tag_lower(secondTag +"_line")
 
     def move_shape(self, event, tag):
         self.canvas.move(tag, event.x - self.lastx, event.y - self.lasty)
         self.canvas.move(tag+"_text", event.x - self.lastx, event.y - self.lasty)
+        self.move_line(tag)
+
+    def move_line(self, tag):
+        ids = self.canvas.find_withtag(tag+"_line")
+        if len(ids) == 0:
+            return
+        for id in ids:
+            tag2 = self.canvas.gettags(id)[2].replace(tag, "").replace("_", "")
+            tag1_coords = self.getCenter(tag)
+            tag2_coords = self.getCenter(tag2)
+            self.canvas.coords(id, tag1_coords[0], tag1_coords[1], tag2_coords[0], tag2_coords[1])
+            self.canvas.tag_lower(tag+"_line")
+            self.canvas.tag_lower(tag2+"_line")
+        
 
     def shape_addText(self, tag, text=""):
         print(text)
