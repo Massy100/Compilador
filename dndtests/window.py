@@ -34,6 +34,8 @@ class Window:
         self.root.columnconfigure(0, weight=1)
         self.root.columnconfigure(1, weight=5)
 
+        self.root.protocol("WM_DELETE_WINDOW", self.quit)
+
         self.current_element = None
         self.shapes = []
         self.texts = []
@@ -53,6 +55,16 @@ class Window:
 
         self.lastx = 0
         self.lasty = 0
+
+    def quit(self):
+        all = self.canvas.find_all()
+        print(all)
+        print([self.canvas.type(x) for x in all])
+        for x in all:
+            if self.canvas.type(x) == "text":
+                print(self.canvas.itemcget(x, "text"))
+        
+        self.root.quit()
 
     def create_frames(self):
         self.canvas_frame = Frame(self.root)
@@ -128,10 +140,33 @@ class Window:
             self.canvas.tag_bind(tag, "<Double-Button-1>", addText_bind)
             self.canvas.tag_bind(shape, "<1>", lambda e: self.savePosn(e, tag))
             self.canvas.tag_bind(tag, "<ButtonRelease-1>", lambda e: self.release_btn(e, tag))
+            self.canvas.tag_bind(tag, "<Double-Button-3>", lambda e: self.delete_shape(tag))
             
             text = self.canvas.create_text(e.x, e.y, text="", fill="black", tags=tag_text)
             self.canvas.lift(text, tag)
             self.texts.append(text) 
+
+            if len(self.shapes) > 1:
+                self.connect_shape(self.shapes[-2], self.shapes[-1])  
+
+    def delete_shape(self, tag):
+        print(self.canvas.find_all())
+
+        shapeIndex = self.shapes.index(tag)
+        prevTag = self.shapes[shapeIndex-1] if shapeIndex > 0 else None
+        nextTag = self.shapes[shapeIndex+1] if shapeIndex < len(self.shapes)-1 else None
+
+        if prevTag and nextTag:
+            self.connect_shape(prevTag, nextTag)
+
+        self.canvas.delete(tag)
+        self.canvas.delete(tag+"_text")
+        self.canvas.delete(tag+"_line")
+        
+        self.shapes.remove(tag)
+        
+        print(self.canvas.find_all())
+        print(self.shapes)
 
     def savePosn(self, e, tag):
         if self.selection_mode:
@@ -158,11 +193,14 @@ class Window:
     def connection(self, e, tag):
         secondTag = self.canvas.find_closest(e.x, e.y,start=tag+"_line")[0]
         secondTag = self.canvas.gettags(secondTag)[0]
-        centerCoords = self.getCenter(secondTag)
-        self.canvas.create_line(self.lastx, self.lasty, centerCoords[0], centerCoords[1], fill="black", width=2, tags=[tag+"_line", secondTag+"_line", tag+"_"+secondTag])
+        self.connect_shape(tag, secondTag)
 
-        self.canvas.tag_lower(tag +"_line")
-        self.canvas.tag_lower(secondTag +"_line")
+    def connect_shape(self, tag1, tag2):
+        tag1_coords = self.getCenter(tag1)
+        tag2_coords = self.getCenter(tag2)
+        line = self.canvas.create_line(tag1_coords[0], tag1_coords[1], tag2_coords[0], tag2_coords[1], fill="black", width=2, tags=[tag1+"_line", tag2+"_line", tag1+"_"+tag2], arrow=LAST)
+        self.canvas.tag_lower(tag1 +"_line")
+        self.canvas.tag_lower(tag2 +"_line")
 
     def move_shape(self, event, tag):
         self.canvas.move(tag, event.x - self.lastx, event.y - self.lasty)
@@ -181,7 +219,6 @@ class Window:
             self.canvas.tag_lower(tag+"_line")
             self.canvas.tag_lower(tag2+"_line")
         
-
     def shape_addText(self, tag, text=""):
         print(text)
         self.canvas.itemconfig(tag, text=text) 
