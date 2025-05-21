@@ -29,12 +29,26 @@ class ModoConexion:
             command=self.seleccionar_conexion
         )
         btn.pack(fill="x", pady=2)
+        
+        ttk.Button(
+        self.frame_conexiones,
+        text="Flecha Sí",
+        width=20,
+        command=lambda: self.seleccionar_conexion("Flecha_SI")
+        ).pack(fill="x", pady=2)
+
+        ttk.Button(
+            self.frame_conexiones,
+            text="Flecha No",
+            width=20,
+            command=lambda: self.seleccionar_conexion("Flecha_NO")
+        ).pack(fill="x", pady=2)
     
-    def seleccionar_conexion(self):
-        print("[DEBUG] Conexión seleccionada")
-        self.app.elemento_seleccionado = "Flecha"
+    def seleccionar_conexion(self, tipo="Flecha"):
+        print(f"[DEBUG] Conexión seleccionada: {tipo}")
+        self.app.elemento_seleccionado = tipo
         self.app.tipo_seleccionado = "Conexiones"
-        self.origen_conexion = None  # Resetear origen al seleccionar nueva conexión
+        self.origen_conexion = None
     
     def manejar_clic_conexion(self, event):
         print(f"\n[DEBUG] Click en ModoConexion - Coordenadas: x={event.x}, y={event.y}")
@@ -134,6 +148,31 @@ class ModoConexion:
             })
             
             print(f"[DEBUG] Flecha creada con ID: {flecha}")
+            
+            # Texto en la flecha si es necesario
+            if self.app.elemento_seleccionado in ["Flecha_SI", "Flecha_NO"]:
+                texto_flecha = "Sí" if self.app.elemento_seleccionado == "Flecha_SI" else "No"
+                texto_x = (start_x + end_x) / 2
+                texto_y = (start_y + end_y) / 2 - 10  # un poco por encima de la línea
+
+                texto_id = self.app.canvas.create_text(
+                    texto_x, texto_y,
+                    text=texto_flecha,
+                    font=(self.app.fuente_normal.actual()['family'], 10),
+                    fill="black",
+                    tags="texto"
+                )
+
+                self.app.textos.append({
+                    "id": texto_id,
+                    "texto": texto_flecha,
+                    "tipo": "Etiqueta Flecha",
+                    "x": texto_x,
+                    "y": texto_y,
+                    "figura": None,
+                    "fuente": 10
+                })
+
             
         except Exception as e:
             print(f"[ERROR] Error al crear flecha: {e}")
