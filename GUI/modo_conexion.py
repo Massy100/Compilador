@@ -71,14 +71,35 @@ class ModoConexion:
         print(f"[DEBUG] Creando flecha de {origen} a {destino}")
         
         try:
-            # Obtener coordenadas de los puntos de conexión (mejorado para evitar superposición)
-            x1, y1, x2, y2 = self.app.canvas.coords(origen)
-            centro_origen_x = (x1 + x2) / 2
-            centro_origen_y = (y1 + y2) / 2
-            
-            x1_d, y1_d, x2_d, y2_d = self.app.canvas.coords(destino)
-            centro_destino_x = (x1_d + x2_d) / 2
-            centro_destino_y = (y1_d + y2_d) / 2
+            coords_origen = self.app.canvas.coords(origen)
+            coords_destino = self.app.canvas.coords(destino)
+
+            # Centro y límites de origen
+            if len(coords_origen) == 4:
+                x1, y1, x2, y2 = coords_origen
+                centro_origen_x = (x1 + x2) / 2
+                centro_origen_y = (y1 + y2) / 2
+            else:
+                xs = coords_origen[::2]
+                ys = coords_origen[1::2]
+                x1, x2 = min(xs), max(xs)
+                y1, y2 = min(ys), max(ys)
+                centro_origen_x = sum(xs) / len(xs)
+                centro_origen_y = sum(ys) / len(ys)
+
+            # Centro y límites de destino
+            if len(coords_destino) == 4:
+                x1_d, y1_d, x2_d, y2_d = coords_destino
+                centro_destino_x = (x1_d + x2_d) / 2
+                centro_destino_y = (y1_d + y2_d) / 2
+            else:
+                xs_d = coords_destino[::2]
+                ys_d = coords_destino[1::2]
+                x1_d, x2_d = min(xs_d), max(xs_d)
+                y1_d, y2_d = min(ys_d), max(ys_d)
+                centro_destino_x = sum(xs_d) / len(xs_d)
+                centro_destino_y = sum(ys_d) / len(ys_d)
+
             
             # Calcular punto de inicio en el borde de la figura origen
             start_x, start_y = self.calcular_punto_borde(

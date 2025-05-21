@@ -80,17 +80,60 @@ class ModoTexto:
                 print(f"[DEBUG] Figura objetivo encontrada: {figura_objetivo}")
                 break
         
-        texto = self.app.elemento_seleccionado
+        texto_nuevo = self.app.elemento_seleccionado
+        
         if figura_objetivo:
-            coords = self.app.canvas.coords(figura_objetivo)
-            print(f"[DEBUG] Coordenadas figura: {coords}")
+            # Buscar la figura en la estructura de datos
+            figura_data = None
+            for figura in self.app.figuras:
+                if figura["id"] == figura_objetivo:
+                    figura_data = figura
+                    break
             
+            if not figura_data:
+                return
+                
+            # Concatenar el nuevo texto con los existentes (si los hay)
+            textos_existentes = [t["texto"] for t in figura_data["textos"]]
+            texto_completo = " ".join(textos_existentes + [texto_nuevo])
+            
+            # Eliminar los textos antiguos
+            for texto_info in figura_data["textos"]:
+                self.app.canvas.delete(texto_info["id"])
+                self.app.textos = [t for t in self.app.textos if t["id"] != texto_info["id"]]
+            
+            figura_data["textos"] = []  # Limpiar textos de la figura
+            
+            # Obtener coordenadas actuales de la figura
+            coords = self.app.canvas.coords(figura_objetivo)
+            if not coords:
+                return
+                
+            # Calcular nuevo tamaño basado en el texto completo
             if len(coords) == 4:  # Rectángulo/Óvalo
-                ancho = coords[2] - coords[0]
-                alto = coords[3] - coords[1]
+                ancho_actual = coords[2] - coords[0]
+                alto_actual = coords[3] - coords[1]
+                
+                # Calcular nuevo tamaño (ancho proporcional al texto)
+                margen = 20
+                ancho_nuevo = max(60, len(texto_completo) * 10 + margen)
+                alto_nuevo = max(40, alto_actual)  # Mantener alto mínimo
+                
+                # Calcular nuevas coordenadas (centradas en la posición original)
                 centro_x = (coords[0] + coords[2]) / 2
                 centro_y = (coords[1] + coords[3]) / 2
-            else:  # Rombo (polygon)
+                x1 = centro_x - ancho_nuevo/2
+                y1 = centro_y - alto_nuevo/2
+                x2 = centro_x + ancho_nuevo/2
+                y2 = centro_y + alto_nuevo/2
+                
+                # Actualizar figura
+                if self.app.canvas.type(figura_objetivo) == "rectangle":
+                    self.app.canvas.coords(figura_objetivo, x1, y1, x2, y2)
+                elif self.app.canvas.type(figura_objetivo) == "oval":
+                    self.app.canvas.coords(figura_objetivo, x1, y1, x2, y2)
+                    
+            elif len(coords) > 4:  # Rombo (polygon)
                 xs = coords[::2]
                 ys = coords[1::2]
                 ancho = max(xs) - min(xs)
@@ -98,25 +141,27 @@ class ModoTexto:
                 centro_x = sum(xs) / len(xs)
                 centro_y = sum(ys) / len(ys)
                 
-            print(f"[DEBUG] Centro calculado: x={centro_x}, y={centro_y}")
+                # Para mantener compatibilidad con el resto del código
+                ancho_nuevo = ancho
+                alto_nuevo = alto
+
             
-            # Calcular tamaño de fuente en base al tamaño de la figura
-            tamaño_fuente = max(8, min(14, int(min(ancho, alto) / len(texto))))
+            # Calcular tamaño de fuente
+            tamaño_fuente = max(8, min(14, int(min(ancho_nuevo, alto_nuevo) / max(1, len(texto_completo)))))
             
+            # Crear el nuevo texto
             texto_id = self.app.canvas.create_text(
                 centro_x, centro_y,
-                text=texto,
+                text=texto_completo,
                 font=(self.app.fuente_normal.actual()['family'], tamaño_fuente),
                 fill="black",
                 tags="texto"
             )
-            print(f"[DEBUG] Texto creado con ID: {texto_id}")
             
-            self.app.canvas.tag_raise(texto_id)
-            
+            # Registrar en estructuras de datos
             self.app.textos.append({
                 "id": texto_id,
-                "texto": texto,
+                "texto": texto_completo,
                 "tipo": self.app.tipo_seleccionado,
                 "x": centro_x,
                 "y": centro_y,
@@ -124,21 +169,18 @@ class ModoTexto:
                 "fuente": tamaño_fuente
             })
             
-            # Actualizar la figura con este texto
-            for figura in self.app.figuras:
-                if figura["id"] == figura_objetivo:
-                    figura["textos"].append({
-                        "id": texto_id,
-                        "texto": texto,
-                        "tipo": self.app.tipo_seleccionado,
-                        "fuente": tamaño_fuente
-                    })
-                    break
+            figura_data["textos"].append({
+                "id": texto_id,
+                "texto": texto_completo,
+                "tipo": self.app.tipo_seleccionado,
+                "fuente": tamaño_fuente
+            })
+            
         else:
-            # Para texto libre (sin figura), usar tamaño de fuente normal
+            # Para texto libre (sin figura)
             texto_id = self.app.canvas.create_text(
                 x, y,
-                text=texto,
+                text=texto_nuevo,
                 font=self.app.fuente_normal,
                 fill="black",
                 tags="texto"
@@ -146,7 +188,7 @@ class ModoTexto:
             
             self.app.textos.append({
                 "id": texto_id,
-                "texto": texto,
+                "texto": texto_nuevo,
                 "tipo": self.app.tipo_seleccionado,
                 "x": x,
                 "y": y,
@@ -249,63 +291,67 @@ class ModoTexto:
             tipo = "valor"
         else:
             return
-        
-        # Obtener posición de la figura
-        coords = self.app.canvas.coords(self.figura_destino)
-        if not coords:
+
+        # Buscar figura
+        figura_data = next((f for f in self.app.figuras if f["id"] == self.figura_destino), None)
+        if not figura_data:
             return
-            
-        # Calcular posición central y tamaño de fuente
-        if len(coords) == 4:  # Rectángulo/Óvalo
-            ancho = coords[2] - coords[0]
-            alto = coords[3] - coords[1]
-            x = (coords[0] + coords[2]) / 2
-            y = (coords[1] + coords[3]) / 2
-        else:  # Rombo (polygon)
+
+        # Concatenar con texto existente
+        textos_existentes = [t["texto"] for t in figura_data["textos"]]
+        texto_completo = " ".join(textos_existentes + [texto])
+
+        # Eliminar textos antiguos
+        for texto_info in figura_data["textos"]:
+            self.app.canvas.delete(texto_info["id"])
+            self.app.textos = [t for t in self.app.textos if t["id"] != texto_info["id"]]
+        figura_data["textos"] = []
+
+        # Redimensionar figura al nuevo texto
+        self.app.ajustar_figura_a_texto(self.figura_destino, texto_completo)
+
+        # Recalcular posición central
+        coords = self.app.canvas.coords(self.figura_destino)
+        if len(coords) == 4:
+            centro_x = (coords[0] + coords[2]) / 2
+            centro_y = (coords[1] + coords[3]) / 2
+        else:
             xs = coords[::2]
             ys = coords[1::2]
-            ancho = max(xs) - min(xs)
-            alto = max(ys) - min(ys)
-            x = sum(xs) / len(xs)
-            y = sum(ys) / len(ys)
-        
-        tamaño_fuente = max(8, min(14, int(min(ancho, alto) / max(1, len(texto)))))
-        
-        print(f"[DEBUG] Posición calculada para texto: x={x}, y={y}, tamaño fuente: {tamaño_fuente}")
-        
-        # Crear el texto en el canvas
+            centro_x = sum(xs) / len(xs)
+            centro_y = sum(ys) / len(ys)
+
+        # Calcular tamaño de fuente
+        ancho = max(coords[::2]) - min(coords[::2])
+        alto = max(coords[1::2]) - min(coords[1::2])
+        tamaño_fuente = max(8, min(14, int(min(ancho, alto) / max(1, len(texto_completo)))))
+
+        # Crear texto unificado
         texto_id = self.app.canvas.create_text(
-            x, y,
-            text=texto,
+            centro_x, centro_y,
+            text=texto_completo,
             font=(self.app.fuente_normal.actual()['family'], tamaño_fuente),
             fill="black",
             tags="texto"
         )
-        print(f"[DEBUG] Texto creado con ID: {texto_id}")
-        
-        # Registrar en la estructura de datos
+
+        # Registrar
         self.app.textos.append({
             "id": texto_id,
-            "texto": texto,
+            "texto": texto_completo,
             "tipo": tipo,
-            "x": x,
-            "y": y,
+            "x": centro_x,
+            "y": centro_y,
             "figura": self.figura_destino,
             "fuente": tamaño_fuente
         })
-        
-        # Actualizar la figura con este texto
-        for figura in self.app.figuras:
-            if figura["id"] == self.figura_destino:
-                figura["textos"].append({
-                    "id": texto_id,
-                    "texto": texto,
-                    "tipo": tipo,
-                    "fuente": tamaño_fuente
-                })
-                break
-        
-        # Resetear el estado y restaurar bordes
+        figura_data["textos"].append({
+            "id": texto_id,
+            "texto": texto_completo,
+            "tipo": tipo,
+            "fuente": tamaño_fuente
+        })
+
         self.resetear_edicion()
         self.app.restaurar_bordes_figuras()
     

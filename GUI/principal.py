@@ -308,6 +308,61 @@ class DiagramaFlujoApp:
                 if t["id"] == texto_info["id"]:
                     t["fuente"] = tamaño_fuente
                     break
+                
+    def ajustar_figura_a_texto(self, figura_id, texto_completo):
+        """Ajusta el tamaño de una figura para que se adapte al texto"""
+        figura = next((f for f in self.figuras if f["id"] == figura_id), None)
+        if not figura:
+            return
+            
+        coords = self.canvas.coords(figura_id)
+        if not coords:
+            return
+            
+        # Calcular nuevo tamaño basado en el texto
+        margen = 20
+        ancho_nuevo = max(60, len(texto_completo) * 10 + margen)
+        alto_nuevo = 40  # Altura fija para simplificar
+        
+        # Calcular centro actual
+        if len(coords) == 4:  # Rectángulo/Óvalo
+            centro_x = (coords[0] + coords[2]) / 2
+            centro_y = (coords[1] + coords[3]) / 2
+        else:  # Rombo (polygon)
+            xs = coords[::2]
+            ys = coords[1::2]
+            centro_x = sum(xs) / len(xs)
+            centro_y = sum(ys) / len(ys)
+        
+        # Nuevas coordenadas (centradas en la posición original)
+        x1 = centro_x - ancho_nuevo/2
+        y1 = centro_y - alto_nuevo/2
+        x2 = centro_x + ancho_nuevo/2
+        y2 = centro_y + alto_nuevo/2
+        
+        # Actualizar figura según su tipo
+        figura_type = self.canvas.type(figura_id)
+        if figura_type == "rectangle":
+            self.canvas.coords(figura_id, x1, y1, x2, y2)
+        elif figura_type == "oval":
+            self.canvas.coords(figura_id, x1, y1, x2, y2)
+        elif figura_type == "polygon":
+            # Para rombo, mantener proporciones pero escalar
+            puntos = [
+                centro_x, y1,
+                x2, centro_y,
+                centro_x, y2,
+                x1, centro_y
+            ]
+            self.canvas.coords(figura_id, *puntos)
+        
+        # Reubicar el texto en el centro
+        for texto_info in figura["textos"]:
+            if texto_info["id"] in [t["id"] for t in self.textos]:
+                self.canvas.coords(texto_info["id"], centro_x, centro_y)
+                self.canvas.itemconfig(texto_info["id"], 
+                                    font=(self.fuente_normal.actual()['family'], 
+                                        max(8, min(14, int(min(ancho_nuevo, alto_nuevo) / max(1, len(texto_completo)))))))
 
 if __name__ == "__main__":
     root = tk.Tk()
