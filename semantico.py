@@ -1,4 +1,4 @@
-from nodos import *
+from GUI.nodos import *
 
 class AnalizadorSemantico:
     def __init__(self):
