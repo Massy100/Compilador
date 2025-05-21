@@ -8,16 +8,17 @@ class ModoFigura:
     def mostrar_elementos(self):
         self.app.ocultar_todos_los_elementos()
         
-        # Configurar el evento de clic específico para este modo
         print("[DEBUG] Configurando binding para clics en el canvas (ModoFigura)")
-        self.app.canvas.unbind("<Button-1>")  # Eliminar cualquier binding previo
+        self.app.canvas.unbind("<Button-1>")
         self.app.canvas.bind("<Button-1>", self.manejar_clic)
         
-        # Crear interfaz de figuras
         figuras = {
-            "Rectángulo": "rectangulo",
-            "Rombo": "rombo",
-            "Óvalo": "ovalo"
+            "Proceso": "rectangulo",
+            "Decisión": "rombo",
+            "Inicio / Fin": "ovalo", 
+            "Proceso": "proceso",
+            "Entrada/Salida": "entrada_salida",
+            "Llamada a Función": "llamada_funcion"
         }
         
         for nombre, tipo in figuras.items():
@@ -49,7 +50,8 @@ class ModoFigura:
             return
         
         x, y = event.x, event.y
-        tamaño = 60  # Tamaño predeterminado de las figuras
+        tamaño = 60
+        figura_id = None
         
         if self.app.elemento_seleccionado == "rectangulo":
             figura_id = self.app.canvas.create_rectangle(
@@ -77,19 +79,52 @@ class ModoFigura:
                 fill="white", outline="black", width=2,
                 tags="figura"
             )
-        elif self.app.elemento_seleccionado == "terminal":
+        elif self.app.elemento_seleccionado == "proceso":
             figura_id = self.app.canvas.create_rectangle(
                 x - tamaño/2, y - tamaño/4,
                 x + tamaño/2, y + tamaño/4,
+                fill="lightgray", outline="black", width=2,
+                tags="figura"
+            )
+        elif self.app.elemento_seleccionado == "entrada_salida":
+            puntos = [
+                x - tamaño / 2, y - tamaño / 4,
+                x + tamaño / 2, y - tamaño / 4,
+                x + tamaño / 3, y + tamaño / 4,
+                x - tamaño / 2 - tamaño / 6, y + tamaño / 4
+            ]
+            figura_id = self.app.canvas.create_polygon(
+                puntos,
+                fill="lightblue", outline="black", width=2,
+                tags="figura"
+            )
+        elif self.app.elemento_seleccionado == "llamada_funcion":
+            figura_id = self.app.canvas.create_rectangle(
+                x - tamaño / 2, y - tamaño / 4,
+                x + tamaño / 2, y + tamaño / 4,
+                fill="lightyellow", outline="black", width=2,
+                tags="figura"
+            )
+            # Líneas internas
+            self.app.canvas.create_line(
+                x - tamaño / 2 + 10, y - tamaño / 4,
+                x - tamaño / 2 + 10, y + tamaño / 4,
+                fill="black", width=1, tags="figura"
+            )
+            self.app.canvas.create_line(
+                x + tamaño / 2 - 10, y - tamaño / 4,
+                x + tamaño / 2 - 10, y + tamaño / 4,
+                fill="black", width=1, tags="figura"
+            )
+        elif self.app.elemento_seleccionado == "terminal":
+            figura_id = self.app.canvas.create_rectangle(
+                x - tamaño / 2, y - tamaño / 4,
+                x + tamaño / 2, y + tamaño / 4,
                 fill="white", outline="black", width=2,
                 tags="figura"
             )
-            # Agregar texto "INICIO" o "FIN" si es terminal
             texto = "INICIO" if len(self.app.figuras) == 0 else "FIN"
-            
-            # Calcular tamaño de fuente basado en el tamaño de la figura
             tamaño_fuente = max(8, min(14, int(tamaño / len(texto))))
-            
             texto_id = self.app.canvas.create_text(
                 x, y,
                 text=texto,
@@ -106,22 +141,23 @@ class ModoFigura:
                 "figura": figura_id,
                 "fuente": tamaño_fuente
             })
-        
+
         # Registrar la figura en la estructura de datos
-        self.app.figuras.append({
-            "id": figura_id,
-            "tipo": self.app.elemento_seleccionado,
-            "x": x,
-            "y": y,
-            "textos": []
-        })
-        
-        if self.app.elemento_seleccionado == "terminal":
-            self.app.figuras[-1]["textos"].append({
-                "id": texto_id,
-                "texto": texto,
-                "tipo": "Terminal",
-                "fuente": tamaño_fuente
-            })
-        
-        print(f"[DEBUG] Figura creada con ID: {figura_id}")
+        if figura_id:
+            figura = {
+                "id": figura_id,
+                "tipo": self.app.elemento_seleccionado,
+                "x": x,
+                "y": y,
+                "textos": []
+            }
+            self.app.figuras.append(figura)
+
+            if self.app.elemento_seleccionado == "terminal":
+                figura["textos"].append({
+                    "id": texto_id,
+                    "texto": texto,
+                    "tipo": "Terminal",
+                    "fuente": tamaño_fuente
+                })
+            print(f"[DEBUG] Figura creada con ID: {figura_id}")

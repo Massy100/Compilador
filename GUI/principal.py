@@ -310,44 +310,58 @@ class DiagramaFlujoApp:
                     break
                 
     def ajustar_figura_a_texto(self, figura_id, texto_completo):
-        """Ajusta el tamaño de una figura para que se adapte al texto"""
         figura = next((f for f in self.figuras if f["id"] == figura_id), None)
         if not figura:
             return
-            
+
         coords = self.canvas.coords(figura_id)
         if not coords:
             return
-            
-        # Calcular nuevo tamaño basado en el texto
+
         margen = 20
         ancho_nuevo = max(60, len(texto_completo) * 10 + margen)
-        alto_nuevo = 40  # Altura fija para simplificar
-        
-        # Calcular centro actual
-        if len(coords) == 4:  # Rectángulo/Óvalo
-            centro_x = (coords[0] + coords[2]) / 2
-            centro_y = (coords[1] + coords[3]) / 2
-        else:  # Rombo (polygon)
+        alto_nuevo = 40  # altura fija
+
+        tipo = figura["tipo"]
+
+        # Calcular centro
+        if len(coords) == 4:
+            x1, y1, x2, y2 = coords
+            centro_x = (x1 + x2) / 2
+            centro_y = (y1 + y2) / 2
+        else:
             xs = coords[::2]
             ys = coords[1::2]
             centro_x = sum(xs) / len(xs)
             centro_y = sum(ys) / len(ys)
-        
-        # Nuevas coordenadas (centradas en la posición original)
-        x1 = centro_x - ancho_nuevo/2
-        y1 = centro_y - alto_nuevo/2
-        x2 = centro_x + ancho_nuevo/2
-        y2 = centro_y + alto_nuevo/2
-        
-        # Actualizar figura según su tipo
-        figura_type = self.canvas.type(figura_id)
-        if figura_type == "rectangle":
+
+        x1 = centro_x - ancho_nuevo / 2
+        y1 = centro_y - alto_nuevo / 2
+        x2 = centro_x + ancho_nuevo / 2
+        y2 = centro_y + alto_nuevo / 2
+
+        if tipo in ["rectangulo", "proceso", "llamada_funcion"]:
             self.canvas.coords(figura_id, x1, y1, x2, y2)
-        elif figura_type == "oval":
+
+            # Si es llamada a función, eliminar y redibujar líneas internas
+            if tipo == "llamada_funcion":
+                for item in self.canvas.find_withtag("figura"):
+                    if self.canvas.type(item) == "line":
+                        bbox = self.canvas.bbox(item)
+                        if bbox and x1 <= bbox[0] <= x2 and y1 <= bbox[1] <= y2:
+                            self.canvas.delete(item)
+                # Redibujar líneas internas
+                self.canvas.create_line(
+                    x1 + 10, y1, x1 + 10, y2, fill="black", width=1, tags="figura"
+                )
+                self.canvas.create_line(
+                    x2 - 10, y1, x2 - 10, y2, fill="black", width=1, tags="figura"
+                )
+
+        elif tipo == "ovalo":
             self.canvas.coords(figura_id, x1, y1, x2, y2)
-        elif figura_type == "polygon":
-            # Para rombo, mantener proporciones pero escalar
+
+        elif tipo == "rombo":
             puntos = [
                 centro_x, y1,
                 x2, centro_y,
@@ -355,14 +369,29 @@ class DiagramaFlujoApp:
                 x1, centro_y
             ]
             self.canvas.coords(figura_id, *puntos)
-        
-        # Reubicar el texto en el centro
+
+        elif tipo == "entrada_salida":
+            puntos = [
+                x1, y1,
+                x2, y1,
+                x2 - ancho_nuevo / 6, y2,
+                x1 - ancho_nuevo / 6, y2
+            ]
+            self.canvas.coords(figura_id, *puntos)
+
+        # Recentrar textos con nuevo tamaño de fuente
         for texto_info in figura["textos"]:
-            if texto_info["id"] in [t["id"] for t in self.textos]:
-                self.canvas.coords(texto_info["id"], centro_x, centro_y)
-                self.canvas.itemconfig(texto_info["id"], 
-                                    font=(self.fuente_normal.actual()['family'], 
-                                        max(8, min(14, int(min(ancho_nuevo, alto_nuevo) / max(1, len(texto_completo)))))))
+            tamaño_fuente = max(8, min(14, int(min(ancho_nuevo, alto_nuevo) / max(1, len(texto_completo)))))
+            self.canvas.coords(texto_info["id"], centro_x, centro_y)
+            self.canvas.itemconfig(
+                texto_info["id"],
+                font=(self.fuente_normal.actual()['family'], tamaño_fuente)
+            )
+
+            for t in self.textos:
+                if t["id"] == texto_info["id"]:
+                    t["fuente"] = tamaño_fuente
+                    break
 
 if __name__ == "__main__":
     root = tk.Tk()
