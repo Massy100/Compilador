@@ -4,4 +4,3 @@ class Nodo:
         self.data = data
         self.izquierdo = None
         self.derecho = None
-
