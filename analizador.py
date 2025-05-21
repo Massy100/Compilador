@@ -10,7 +10,7 @@ from semantico import *
 token_patron = {
     "PREPROCESSOR": r'\#include\b',  
     "HEADER": r'<[a-zA-Z0-9_.]+>',  
-    "KEYWORD": r'\b(if|else|while|switch|case|return|print|break|for|int|float|void|double|char|const)\b',
+    "KEYWORD": r'\b(if|else|while|switch|case|return|print|break|for|int|float|void|double|char|const|True|False)\b',
     "LIB_FUNCTION": r'\b(printf|scanf)\b',
     "IDENTIFIER": r'\b[a-zA-Z_][a-zA-Z0-9_]*\b',
     "NUMBER": r'\b\d+(\.\d+)?f?\b',
