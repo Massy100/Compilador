@@ -4,6 +4,7 @@ from modo_texto import ModoTexto
 from modo_figura import ModoFigura
 from modo_conexion import ModoConexion
 
+
 class DiagramaFlujoApp:
     def __init__(self, root):
         self.root = root
@@ -248,6 +249,27 @@ class DiagramaFlujoApp:
                 self.conexiones.remove(conexion)
     
     def mostrar_en_consola(self):
+        
+        final = 0
+
+        actual = 0
+
+        condicion = 0
+
+        stack_wi = []
+
+        stack_pos = []
+
+        stack_real = []
+
+        nueva_coneccion = []
+
+        archivo = open("mi_archivo.txt", "w") 
+        
+        archivo.write("//Otra linea de texto.\n")   #holiwis
+
+
+
         print("\n=== Resumen del Diagrama ===")
         
         print("\nTextos:")
@@ -259,15 +281,66 @@ class DiagramaFlujoApp:
                         figura_info = f"{figura['tipo']} (ID: {figura['id']})"
                         break
             print(f"Texto: {texto['texto']}, Categoría: {texto['tipo']}, Figura: {figura_info}")
+
         
         print("\nFiguras:")
-        for figura in self.figuras:
+        for i, figura in enumerate(self.figuras): #sehace este for para poder guardar la posicion en memoria y el id de la figura
             textos_en_figura = ", ".join([t["texto"] for t in figura["textos"]])
             print(f"ID: {figura['id']}, Tipo: {figura['tipo']}, Textos: [{textos_en_figura}]")
-        
+
+            if textos_en_figura[:6] == "INICIO": #Se guarda el id de la figura inicio para comensar el programa, esta se guarda en actual
+                actual = (figura["id"])
+            
+            elif textos_en_figura[:5] == "FINAL": #Se guardan todos los id de los finales para poder saber como seguir en el programa 
+                final = (figura["id"])
+
+            elif textos_en_figura[:2] == "if": #se guardan los if de las figuras if para poderlas comparar con las conexiones a fututuro
+                stack_pos.append(i)
+                stack_wi.append(figura['id'])
+                textos_en_figura = textos_en_figura[:-1] + "{"
+            elif textos_en_figura[:5] == "while": #se guardan tambien los de while pero eso aun no se aplica
+                stack_pos.append(i)
+                stack_wi.append(figura['id'])
+                textos_en_figura = textos_en_figura[:-1] + "{"
+            else:
+                textos_en_figura = textos_en_figura + " ;" #todos los textos que no sean if o while se les agrega su ;
+                
+            archivo.write(f"{''.join(textos_en_figura)}\n")
+            
+    
         print("\nConexiones:")
-        for conexion in self.conexiones:
+        while len(stack_pos) > 0: #se usa el stack pos como contadore or que de el se aran los pops cada se que cumple un if o un while
+
+            for conexion in self.conexiones:
+                print(f"De figura {conexion['origen']} a figura {conexion['destino']}")
+                try:
+                    stack_wi.index(conexion["origen"]) #buscamos si la coneccion en la que estamos es un if o while
+                    if (conexion["destino"]) == condicion: #si es un if verificamos si su destino es = a la condicion actual lo que significa que ya pasamos por esta figura
+                        actual = conexion["origen"] #vamos a seguir avanzando por la figura de la izquierda
+                        nueva_coneccion.append(conexion)
+
+                    else:
+                        nueva_coneccion.append(conexion)
+                        actual = conexion["destino"]
+                        condicion = (conexion["destino"]) #simplemente avanzamos
+
+
+                except ValueError:
+                    if conexion["origen"] == actual:
+                        nueva_coneccion.append(conexion)
+                        actual = conexion["destino"]
+                        break
+                    if conexion["destino"] == final and len[stack_wi] != 0: #verificamos que el stack no este teminado para dar un pop sin problemas
+                        nueva_coneccion.append(conexion)
+                        actual = stack_wi.pop()
+        print("\nFiguras ordenada:")            
+        for conexion in nueva_coneccion:
+            
             print(f"De figura {conexion['origen']} a figura {conexion['destino']}")
+        
+        
+            
+
     
     def limpiar_canvas(self):
         self.canvas.delete("all")
