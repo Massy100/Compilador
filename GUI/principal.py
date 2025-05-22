@@ -129,8 +129,15 @@ class DiagramaFlujoApp:
         self.canvas.pack(expand=True, fill="both")
     
     def crear_controles_inferiores(self):
-        controles_frame = ttk.Frame(self.root)
-        controles_frame.pack(side="bottom", fill="x", padx=5, pady=5)
+        style = ttk.Style()
+        style.configure("Blanco.TFrame", background="white")
+
+        controles_frame = ttk.Frame(
+            self.root,
+            padding=(5, 2),
+            style="Blanco.TFrame"
+        )
+        controles_frame.place(relx=1.0, rely=0.0, anchor="ne", x=-9, y=10)
         
         ttk.Button(
             controles_frame, 
