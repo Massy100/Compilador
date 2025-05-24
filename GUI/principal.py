@@ -319,7 +319,7 @@ class DiagramaFlujoApp:
             else:
                 textos_en_figura = textos_en_figura + " ;" #todos los textos que no sean if o while se les agrega su ;
                 
-            archivo.write(f"{''.join(textos_en_figura)}\n")
+            
             
 
         print("\nConexiones:")            
@@ -342,8 +342,10 @@ class DiagramaFlujoApp:
                         if flag_pop == 0:
                             stack.append(busqueda["origen"]) #si es un if o while guardamos la conexion en el stack
                         else:
+                            archivo.write("else{\n")   
                             flag_pop = 0
                         nueva_coneccion.append(busqueda)
+                        archivo.write(self.buscar_bloque(busqueda["destino"]))
                         copia_conexiones.remove(busqueda)
                         actual = busqueda["destino"]
                         break
@@ -355,24 +357,36 @@ class DiagramaFlujoApp:
                     if busqueda["origen"] == actual:
                         print("Encontrado")
                         nueva_coneccion.append(busqueda)
+                        archivo.write(self.buscar_bloque(busqueda["destino"]))
                         copia_conexiones.remove(busqueda)
                         actual = busqueda["destino"]
                         break
                 if actual == final and len(stack) != 0: #verificamos que el stack no este teminado para dar un pop sin problemas
                     #nueva_coneccion.append(busqueda)
+                    
                     actual = stack.pop()
                     flag_pop = 1
 
                     
         print("\nFiguras ordenada:")            
         for conexion in nueva_coneccion:
-            
             print(f"De figura {conexion['origen']} a figura {conexion['destino']}")
         
         
             
 
-    
+    def buscar_bloque(self,id_bloque):
+        for figura in self.figuras:
+            if figura["id"] == id_bloque:
+                textos_en_figura = " ".join([t["texto"] for t in figura["textos"]])
+                if textos_en_figura == "FIN":
+                    return "}\n"
+                elif textos_en_figura == "if":
+                    return textos_en_figura + " {\n"
+                return textos_en_figura + "\n"
+        return "//Error en busqueda"
+            
+
     def limpiar_canvas(self):
         self.canvas.delete("all")
         self.figuras = []

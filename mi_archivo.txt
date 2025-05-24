@@ -1,7 +1,8 @@
 //Otra linea de texto.
-INICIO
-FIN
- ;
- ;
- ;
-i{
+char
+if {
+char
+//Fin de bloque
+}else{
+double
+//Fin de bloque
