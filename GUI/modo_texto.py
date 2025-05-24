@@ -27,23 +27,37 @@ class ModoTexto:
         
         # Resto del código de mostrar_elementos...
         self.crear_seccion_texto_manual()
-        
-        for categoria, elementos in self.categorias.items():
-            frame = ttk.Frame(self.app.scrollable_frame, padding=(5, 2))
-            frame.pack(fill="x", pady=(10, 0), padx=5)
+        frameTexto = ttk.Frame(self.app.scrollable_frame, padding=(5, 2))
+        frameTexto.pack(fill="both", expand=True, pady=(10, 0), padx=5)
+
+        # Número de columnas en la cuadrícula
+        columnas = 2
+        fila = 0
+        columna = 0
+
+        for i, (categoria, elementos) in enumerate(self.categorias.items()):
+            frame = ttk.Frame(frameTexto, padding=(5, 2), relief="groove", borderwidth=2)
+            frame.grid(row=fila, column=columna, padx=5, pady=5, sticky="nsew")
             self.frames_categorias[categoria] = frame
-            
+
             label = ttk.Label(frame, text=categoria, font=self.app.fuente_titulo)
             label.pack(anchor="w")
-            
+
             for elemento in elementos:
                 btn = ttk.Button(
-                    frame, 
-                    text=elemento, 
-                    width=20,
+                    frame,
+                    text=elemento,
+                    width=10,
                     command=lambda e=elemento, t=categoria: self.seleccionar_elemento(e, t)
                 )
-                btn.pack(fill="x", pady=2)
+                btn.pack(pady=2)
+
+            # Actualizar posición en la cuadrícula
+            columna += 1
+            if columna >= columnas:
+                columna = 0
+                fila += 1
+
 
     def manejar_clic_texto(self, event):
         print(f"\n[DEBUG] Click en ModoTexto - Coordenadas: x={event.x}, y={event.y}")

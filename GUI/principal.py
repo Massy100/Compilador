@@ -3,6 +3,8 @@ from tkinter import ttk, font, messagebox
 from modo_texto import ModoTexto
 from modo_figura import ModoFigura
 from modo_conexion import ModoConexion
+import os
+
 
 
 class DiagramaFlujoApp:
@@ -128,8 +130,15 @@ class DiagramaFlujoApp:
         self.canvas.pack(expand=True, fill="both")
     
     def crear_controles_inferiores(self):
-        controles_frame = ttk.Frame(self.root)
-        controles_frame.pack(side="bottom", fill="x", padx=5, pady=5)
+        style = ttk.Style()
+        style.configure("Blanco.TFrame", background="white")
+
+        controles_frame = ttk.Frame(
+            self.root,
+            padding=(5, 2),
+            style="Blanco.TFrame"
+        )
+        controles_frame.place(relx=1.0, rely=0.0, anchor="ne", x=-9, y=10)
         
         ttk.Button(
             controles_frame, 
@@ -148,6 +157,13 @@ class DiagramaFlujoApp:
             text="Borrar Elemento",
             command=self.borrar_elemento_manual
         ).pack(side="left", padx=5)
+        
+        ttk.Button(
+        controles_frame,
+        text="Generar salida.txt",
+        command=self.generar_archivo_salida
+        ).pack(side="left", padx=5)
+
     
     def manejar_clic(self, event):
         # Si estamos en modo texto y en modo edición, dejar que ModoTexto maneje el clic
@@ -465,6 +481,42 @@ class DiagramaFlujoApp:
                 if t["id"] == texto_info["id"]:
                     t["fuente"] = tamaño_fuente
                     break
+
+    def generar_archivo_salida(self):
+        ruta = "salida.txt"
+
+        try:
+            with open(ruta, "w", encoding="utf-8") as archivo:
+                ya_escritos = set()
+
+                for conexion in self.conexiones:
+                    figura_origen = conexion["origen"]
+                    figura = next((f for f in self.figuras if f["id"] == figura_origen), None)
+                    if not figura or figura["id"] in ya_escritos:
+                        continue
+
+                    # Construir el texto unido de esa figura
+                    textos = [t["texto"] for t in figura["textos"]]
+                    texto_completo = " ".join(textos).strip()
+                    if texto_completo:
+                        archivo.write(texto_completo + "\n")
+                        ya_escritos.add(figura["id"])
+
+                # Incluir la última figura si no ha sido escrita
+                figura_final = self.conexiones[-1]["destino"] if self.conexiones else None
+                if figura_final and figura_final not in ya_escritos:
+                    figura = next((f for f in self.figuras if f["id"] == figura_final), None)
+                    if figura:
+                        textos = [t["texto"] for t in figura["textos"]]
+                        texto_completo = " ".join(textos).strip()
+                        if texto_completo:
+                            archivo.write(texto_completo + "\n")
+
+            print("[OK] Archivo 'salida.txt' generado correctamente.")
+
+        except Exception as e:
+            print(f"[ERROR] No se pudo crear el archivo: {e}")
+
 
 if __name__ == "__main__":
     root = tk.Tk()
