@@ -330,6 +330,7 @@ class DiagramaFlujoApp:
         print("\nConexiones Ordenar: ", actual, final, len(stack))
         
         while True: #se usa el stack pos como contadore or que de el se aran los pops cada se que cumple un if o un while
+            print("movimiento: ", actual, final, len(stack))
             if actual == final and len(stack) == 0 and flag_pop == 0:
                 break
             
@@ -342,8 +343,13 @@ class DiagramaFlujoApp:
                         if flag_pop == 0:
                             stack.append(busqueda["origen"]) #si es un if o while guardamos la conexion en el stack
                         else:
-                            archivo.write("else{\n")   
-                            flag_pop = 0
+                            try:
+                                lista_if.index(busqueda["destino"]) #si es un if o while y ya se hizo un pop, buscamos si la siguiente conexion es otro if o while
+                                archivo.write("else ")
+                                flag_pop = 0 
+                            except ValueError:
+                                archivo.write("else{\n")   
+                                flag_pop = 0
                         nueva_coneccion.append(busqueda)
                         archivo.write(self.buscar_bloque(busqueda["destino"]))
                         copia_conexiones.remove(busqueda)
@@ -371,6 +377,9 @@ class DiagramaFlujoApp:
         print("\nFiguras ordenada:")            
         for conexion in nueva_coneccion:
             print(f"De figura {conexion['origen']} a figura {conexion['destino']}")
+
+        archivo.close()
+
         
         
             

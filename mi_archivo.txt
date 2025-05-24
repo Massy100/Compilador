@@ -1,8 +1,11 @@
 //Otra linea de texto.
-char
+
 if {
-char
-//Fin de bloque
-}else{
-double
-//Fin de bloque
+
+}
+else if {
+
+}
+else{
+
+}
