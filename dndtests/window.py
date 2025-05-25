@@ -34,11 +34,10 @@ class Window:
         self.root.columnconfigure(0, weight=1)
         self.root.columnconfigure(1, weight=5)
 
-        self.root.protocol("WM_DELETE_WINDOW", self.quit)
-
         self.current_element = None
         self.shapes = []
         self.texts = []
+        self.lines = []  
 
         self.selection_mode = True 
         self.connection_mode = True 
@@ -55,16 +54,6 @@ class Window:
 
         self.lastx = 0
         self.lasty = 0
-
-    def quit(self):
-        all = self.canvas.find_all()
-        print(all)
-        print([self.canvas.type(x) for x in all])
-        for x in all:
-            if self.canvas.type(x) == "text":
-                print(self.canvas.itemcget(x, "text"))
-        
-        self.root.quit()
 
     def create_frames(self):
         self.canvas_frame = Frame(self.root)
@@ -86,6 +75,7 @@ class Window:
             btn = Button(self.elements_frame, text=btnTxts[i], command=lambda i=i: self.canvas_mode(btnTxts[i]))
             btn.grid(row=i, column=0, sticky="ew")
             self.elements_frame.rowconfigure(i, weight=1)
+#        Button(self.elements_frame, text="Codigo", command=).grid(row=len(btnTxts), column=0, sticky="ew")
 
         self.canvas.bind("<Button-1>", lambda e: self.on_click(e))
     
@@ -130,11 +120,13 @@ class Window:
                     (e.x-20,e.y+12)
                     
                 ]
-                shape = self.canvas.create_polygon(points, fill="grey", tags=tag, smooth=True)
+                shape = self.canvas.create_polygon(points, fill="grey", tags=[tag, "terminal"], smooth=True)
                 textFunction = 4
-            addText_bind = lambda e: self.shape_addText(tag_text, self.dlg(textFunction))
+            self.canvas.addtag_withtag("shape", shape)
+
+            tag_text = [tag, "text"]
+            addText_bind = lambda e: self.shape_addText(f"{tag}&&text", self.dlg(textFunction))
                 
-            tag_text = f"{tag}_text"
             self.shapes.append(tag) 
             
             self.canvas.tag_bind(tag, "<Double-Button-1>", addText_bind)
@@ -146,23 +138,11 @@ class Window:
             self.canvas.lift(text, tag)
             self.texts.append(text) 
 
-            if len(self.shapes) > 1:
-                self.connect_shape(self.shapes[-2], self.shapes[-1])  
+            #if len(self.shapes) > 1:
+            #    self.connect_shape(self.shapes[-2], self.shapes[-1])  
 
     def delete_shape(self, tag):
-        print(self.canvas.find_all())
-
-        shapeIndex = self.shapes.index(tag)
-        prevTag = self.shapes[shapeIndex-1] if shapeIndex > 0 else None
-        nextTag = self.shapes[shapeIndex+1] if shapeIndex < len(self.shapes)-1 else None
-
-        if prevTag and nextTag:
-            self.connect_shape(prevTag, nextTag)
-
         self.canvas.delete(tag)
-        self.canvas.delete(tag+"_text")
-        self.canvas.delete(tag+"_line")
-        
         self.shapes.remove(tag)
         
         print(self.canvas.find_all())
@@ -175,7 +155,7 @@ class Window:
             self.lastx, self.lasty = self.getCenter(tag)
 
     def getCenter(self, tag):
-        coords = self.canvas.coords(tag)
+        coords = self.canvas.coords(f"{tag}&&shape")
         x_cords = coords[::2]
         y_cords = coords[1::2]
 
@@ -191,16 +171,33 @@ class Window:
             self.connection(e, tag)
     
     def connection(self, e, tag):
-        secondTag = self.canvas.find_closest(e.x, e.y,start=tag+"_line")[0]
+        secondTag = self.canvas.find_closest(e.x, e.y)[0]
         secondTag = self.canvas.gettags(secondTag)[0]
-        self.connect_shape(tag, secondTag)
+        choiceTag = ""
+        if "cond" in tag:
+            lines = self.canvas.find_withtag(tag+"&&0&&line")
+            choiceTag = "0" if len(lines) == 0 else "1"
 
-    def connect_shape(self, tag1, tag2):
+                
+        self.connect_shape(tag, secondTag, choiceTag)
+
+    def connect_shape(self, tag1, tag2, choicetag=None):
         tag1_coords = self.getCenter(tag1)
         tag2_coords = self.getCenter(tag2)
-        line = self.canvas.create_line(tag1_coords[0], tag1_coords[1], tag2_coords[0], tag2_coords[1], fill="black", width=2, tags=[tag1+"_line", tag2+"_line", tag1+"_"+tag2], arrow=LAST)
-        self.canvas.tag_lower(tag1 +"_line")
-        self.canvas.tag_lower(tag2 +"_line")
+
+        height_offset = shape_height
+
+        if tag1_coords[1] < tag2_coords[1]:
+            height_offset *= -1
+
+        tags = [tag1, tag2]
+        if choicetag:
+            tags.append(choicetag)
+
+        tags.append("line")
+        line = self.canvas.create_line(tag1_coords[0], tag1_coords[1], tag2_coords[0], tag2_coords[1] + height_offset, fill="black", width=2, tags=tags, arrow=LAST)
+        self.canvas.lower(line)
+        print(self.canvas.gettags(line))
 
     def move_shape(self, event, tag):
         self.canvas.move(tag, event.x - self.lastx, event.y - self.lasty)
@@ -208,21 +205,24 @@ class Window:
         self.move_line(tag)
 
     def move_line(self, tag):
-        ids = self.canvas.find_withtag(tag+"_line")
-        if len(ids) == 0:
-            return
+        ids = self.canvas.find_withtag(f"{tag}&&line")
         for id in ids:
-            tag2 = self.canvas.gettags(id)[2].replace(tag, "").replace("_", "")
-            tag1_coords = self.getCenter(tag)
+            tag1 = self.canvas.gettags(id)[0]
+            tag2 = self.canvas.gettags(id)[1]
+
+            tag1_coords = self.getCenter(tag1)
             tag2_coords = self.getCenter(tag2)
-            self.canvas.coords(id, tag1_coords[0], tag1_coords[1], tag2_coords[0], tag2_coords[1])
-            self.canvas.tag_lower(tag+"_line")
-            self.canvas.tag_lower(tag2+"_line")
+
+            height_offset = shape_height
+
+            if tag1_coords[1] < tag2_coords[1]:
+                height_offset *= -1
+
+            self.canvas.coords(id, tag1_coords[0], tag1_coords[1], tag2_coords[0], tag2_coords[1]+height_offset)
+            self.canvas.tag_lower(id)
         
     def shape_addText(self, tag, text=""):
-        print(text)
         self.canvas.itemconfig(tag, text=text) 
-        print(self.canvas.itemcget(tag, "text")) 
 
     def check_identifier(self, newval, action, index):
         # Check if the new value matches the pattern
@@ -288,8 +288,12 @@ class Window:
             case 1:
                 title = "Condición"
                 
+                typeVar = StringVar()
+                types = ["if", "while", "for"]
+                addCombo(dlg, typeVar, types, 0, 0)
+
                 conditionVar = StringVar()
-                txtCondition = addEntry(dlg, conditionVar, self.check_condition_wrapper, 0, 0)
+                txtCondition = addEntry(dlg, conditionVar, self.check_condition_wrapper, 0, 1)
                 txtCondition.focus_set()
 
             case 2:
@@ -301,7 +305,7 @@ class Window:
                 msgVar = StringVar()
                 txtMsg = addEntry(dlg, msgVar, self.check_string_wrapper, 0, 1)
                 txtMsg.focus_set()
-
+ 
                 typeVar = StringVar()
                 types = ["Escribir", "Leer"]
                 addCombo(dlg, typeVar, types, 1, 0)
@@ -346,7 +350,7 @@ class Window:
             case 0:
                 result = f"{typeVar.get()} {idVar.get()}{' = '+ valueVar.get() if valueVar.get() else ''};"
             case 1:
-                result = f"{conditionVar.get()}"
+                result = f"{typeVar.get()} ({conditionVar.get()})"
             case 2:
                 result = f"{msgVar.get()}\n{typeVar.get()} {idVar.get()}"
             case 3:
