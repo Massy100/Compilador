@@ -5,8 +5,8 @@ class ModoTexto:
     def __init__(self, app):
         self.app = app
         self.categorias = {
-            "Palabra Clave": ["if", "else", "while", "switch", "case", "return", 
-                            "print", "break", "for", "int", "float", "void", 
+            "Palabra Clave": ["if", "else", "return", "while", "for", "in", "range",
+                            "print", "break", "int", "float", "void", 
                             "double", "char", "const", "true", "false"],
             "Operador": ["+", "-", "*", "/", "=", "<", ">", "!", "_"],
             "Delimitadores": ["(", ")", ",", ";", "{", "}"],

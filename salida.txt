@@ -1,7 +1,12 @@
-switch
-switch
-switch switch switch
-switch
-switch switch switch
-switch switch
-switch else else else
+// Inicio del programa
+if {
+    print;
+    while {
+        if {
+            print;
+            for in range {
+            }
+        }
+    }
+}
+// Fin del programa

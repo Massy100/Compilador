@@ -16,10 +16,11 @@ class ModoFigura:
             "Proceso": "rectangulo",
             "Decisión": "rombo",
             "Inicio / Fin": "ovalo", 
-            "Proceso": "proceso",
             "Entrada/Salida": "entrada_salida",
-            "Llamada a Función": "llamada_funcion"
-        }
+            "Llamada a Función": "llamada_funcion",
+            "Bucle While": "while",
+            "Bucle For": "for"
+}
         
         for nombre, tipo in figuras.items():
             frame = ttk.Frame(self.app.scrollable_frame, padding=(5, 2))
@@ -103,6 +104,20 @@ class ModoFigura:
                 x - tamaño / 2, y - tamaño / 4,
                 x + tamaño / 2, y + tamaño / 4,
                 fill="lightyellow", outline="black", width=2,
+                tags="figura"
+            )
+        elif self.app.elemento_seleccionado == "while":
+            figura_id = self.app.canvas.create_rectangle(
+                x - tamaño/2, y - tamaño/4,
+                x + tamaño/2, y + tamaño/4,
+                fill="lightgreen", outline="black", width=2,
+                tags="figura"
+            )
+        elif self.app.elemento_seleccionado == "for":
+            figura_id = self.app.canvas.create_rectangle(
+                x - tamaño/2, y - tamaño/4,
+                x + tamaño/2, y + tamaño/4,
+                fill="lightblue", outline="black", width=2,
                 tags="figura"
             )
             # Líneas internas

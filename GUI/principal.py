@@ -265,125 +265,119 @@ class DiagramaFlujoApp:
                 self.conexiones.remove(conexion)
     
     def mostrar_en_consola(self):
+        archivo = open("salida.txt", "w")
         
+        # Identificar nodos importantes
+        inicio = None
+        finales = []
+        bucles = {}  # {id_figura: tipo_bucle}
+        decisiones = []
         
-
-        flag_pop = 0 
-
-        lista_if = []
-
+        for figura in self.figuras:
+            textos = [t["texto"] for t in figura["textos"]]
+            texto_completo = " ".join(textos)
+            
+            if texto_completo.startswith("INICIO"):
+                inicio = figura["id"]
+            elif texto_completo.startswith("FIN"):
+                finales.append(figura["id"])
+            elif texto_completo.startswith("while"):
+                bucles[figura["id"]] = "while"
+            elif texto_completo.startswith("for"):
+                bucles[figura["id"]] = "for"
+            elif texto_completo.startswith("if"):
+                decisiones.append(figura["id"])
+        
+        if not inicio:
+            archivo.write("// No se encontró nodo INICIO\n")
+            archivo.close()
+            return
+        
+        # Estructuras para manejar el flujo
+        visitados = set()
         stack = []
-
-        copia_conexiones = self.conexiones
-
-        nueva_coneccion = []
-
-        archivo = open("mi_archivo.txt", "w") 
+        current = inicio
+        indentacion = 0
+        bloques_abiertos = []  # Para llevar registro de bloques abiertos
         
-        archivo.write("//Otra linea de texto.\n")   #holiwis
-
-
-
-        print("\n=== Resumen del Diagrama ===")
-        
-        print("\nTextos:")
-        for texto in self.textos:
-            figura_info = "Ninguna"
-            if texto["figura"]:
-                for figura in self.figuras:
-                    if figura["id"] == texto["figura"]:
-                        figura_info = f"{figura['tipo']} (ID: {figura['id']})"
-                        break
-            print(f"Texto: {texto['texto']}, Categoría: {texto['tipo']}, Figura: {figura_info}")
-
-        
-        print("\nFiguras:")
-        for i, figura in enumerate(self.figuras): #sehace este for para poder guardar la posicion en memoria y el id de la figura
-            textos_en_figura = ", ".join([t["texto"] for t in figura["textos"]])
-            print(f"ID: {figura['id']}, Tipo: {figura['tipo']}, Textos: [{textos_en_figura}]")
-
-            if textos_en_figura[:6] == "INICIO": #Se guarda el id de la figura inicio para comensar el programa, esta se guarda en actual
-                actual = (figura["id"])
-            
-            elif textos_en_figura[:3] == "FIN": #Se guardan todos los id de los finales para poder saber como seguir en el programa 
-                final = (figura["id"])
-
-            elif textos_en_figura[:2] == "if": #se guardan los if de las figuras if para poderlas comparar con las conexiones a fututuro
+        while current:
+            if current in visitados:
+                # Manejo de bucles
+                if current in bucles:
+                    # Cerramos el bucle si volvemos al inicio
+                    if bloques_abiertos and bloques_abiertos[-1] == current:
+                        indentacion -= 4
+                        archivo.write(" " * indentacion + "}\n")
+                        bloques_abiertos.pop()
+                current = None
+                continue
                 
-                lista_if.append(figura['id'])
-                textos_en_figura = textos_en_figura[:-1] + "{"
-            elif textos_en_figura[:5] == "while": #se guardan tambien los de while pero eso aun no se aplica
-                
-                lista_if.append(figura['id'])
-                textos_en_figura = textos_en_figura[:-1] + "{"
-            else:
-                textos_en_figura = textos_en_figura + " ;" #todos los textos que no sean if o while se les agrega su ;
-                
-            
-            
-
-        print("\nConexiones:")            
-        for conexion in copia_conexiones:
-            
-            print(f"De figura {conexion['origen']} a figura {conexion['destino']}")
-
-        print("\nConexiones Ordenar: ", actual, final, len(stack))
-        
-        while True: #se usa el stack pos como contadore or que de el se aran los pops cada se que cumple un if o un while
-            print("movimiento: ", actual, final, len(stack))
-            if actual == final and len(stack) == 0 and flag_pop == 0:
+            visitados.add(current)
+            figura = next((f for f in self.figuras if f["id"] == current), None)
+            if not figura:
                 break
-            
-            
-            try:
-                lista_if.index(actual) #buscamos si la coneccion en la que estamos es un if o while
-                for busqueda in copia_conexiones:
-                    
-                    if busqueda["origen"] == actual:
-                        if flag_pop == 0:
-                            stack.append(busqueda["origen"]) #si es un if o while guardamos la conexion en el stack
-                        else:
-                            try:
-                                lista_if.index(busqueda["destino"]) #si es un if o while y ya se hizo un pop, buscamos si la siguiente conexion es otro if o while
-                                archivo.write("else ")
-                                flag_pop = 0 
-                            except ValueError:
-                                archivo.write("else{\n")   
-                                flag_pop = 0
-                        nueva_coneccion.append(busqueda)
-                        archivo.write(self.buscar_bloque(busqueda["destino"]))
-                        copia_conexiones.remove(busqueda)
-                        actual = busqueda["destino"]
-                        break
-                        
                 
-
-            except ValueError:
-                for busqueda in copia_conexiones:
-                    if busqueda["origen"] == actual:
-                        print("Encontrado")
-                        nueva_coneccion.append(busqueda)
-                        archivo.write(self.buscar_bloque(busqueda["destino"]))
-                        copia_conexiones.remove(busqueda)
-                        actual = busqueda["destino"]
-                        break
-                if actual == final and len(stack) != 0: #verificamos que el stack no este teminado para dar un pop sin problemas
-                    #nueva_coneccion.append(busqueda)
-                    
-                    actual = stack.pop()
-                    flag_pop = 1
-
-                    
-        print("\nFiguras ordenada:")            
-        for conexion in nueva_coneccion:
-            print(f"De figura {conexion['origen']} a figura {conexion['destino']}")
-
-        archivo.close()
-
-        
-        
+            textos = [t["texto"] for t in figura["textos"]]
+            texto_completo = " ".join(textos)
             
-
+            # Escribir el código según el tipo de figura
+            if texto_completo.startswith("INICIO"):
+                archivo.write("// Inicio del programa\n")
+            elif texto_completo.startswith("FIN"):
+                # Cerramos todos los bloques abiertos antes del FIN
+                while bloques_abiertos:
+                    indentacion -= 4
+                    archivo.write(" " * indentacion + "}\n")
+                    bloques_abiertos.pop()
+                archivo.write("// Fin del programa\n")
+            elif current in bucles:
+                tipo_bucle = bucles[current]
+                archivo.write(" " * indentacion + f"{texto_completo} {{\n")
+                indentacion += 4
+                bloques_abiertos.append(current)
+            elif current in decisiones:
+                archivo.write(" " * indentacion + f"{texto_completo} {{\n")
+                indentacion += 4
+                bloques_abiertos.append(current)
+            else:
+                # Comandos normales
+                if texto_completo:
+                    archivo.write(" " * indentacion + f"{texto_completo};\n")
+            
+            # Manejo de conexiones
+            conexiones = [c for c in self.conexiones if c["origen"] == current]
+            
+            if not conexiones:
+                current = None
+            elif len(conexiones) == 1:
+                current = conexiones[0]["destino"]
+            else:
+                # Para decisiones o bucles con múltiples salidas
+                if current in decisiones or current in bucles:
+                    # Conexión "Sí" (primera) y "No" (segunda)
+                    current = conexiones[0]["destino"]
+                    stack.append((conexiones[1]["destino"], indentacion, current in decisiones))
+                else:
+                    current = conexiones[0]["destino"]
+            
+            # Si no hay más conexiones pero hay bloques pendientes
+            if not current and stack:
+                next_node, next_indent, is_decision = stack.pop()
+                if is_decision:
+                    indentacion = next_indent - 4
+                    archivo.write(" " * indentacion + "} else {\n")
+                    indentacion += 4
+                current = next_node
+        
+        # Cerramos cualquier bloque que haya quedado abierto
+        while bloques_abiertos:
+            indentacion -= 4
+            archivo.write(" " * indentacion + "}\n")
+            bloques_abiertos.pop()
+        
+        archivo.close()
+        print("[OK] Diagrama convertido a salida.txt")
+    
     def buscar_bloque(self,id_bloque):
         for figura in self.figuras:
             if figura["id"] == id_bloque:
@@ -521,40 +515,7 @@ class DiagramaFlujoApp:
                     break
 
     def generar_archivo_salida(self):
-        ruta = "salida.txt"
-
-        try:
-            with open(ruta, "w", encoding="utf-8") as archivo:
-                ya_escritos = set()
-
-                for conexion in self.conexiones:
-                    figura_origen = conexion["origen"]
-                    figura = next((f for f in self.figuras if f["id"] == figura_origen), None)
-                    if not figura or figura["id"] in ya_escritos:
-                        continue
-
-                    # Construir el texto unido de esa figura
-                    textos = [t["texto"] for t in figura["textos"]]
-                    texto_completo = " ".join(textos).strip()
-                    if texto_completo:
-                        archivo.write(texto_completo + "\n")
-                        ya_escritos.add(figura["id"])
-
-                # Incluir la última figura si no ha sido escrita
-                figura_final = self.conexiones[-1]["destino"] if self.conexiones else None
-                if figura_final and figura_final not in ya_escritos:
-                    figura = next((f for f in self.figuras if f["id"] == figura_final), None)
-                    if figura:
-                        textos = [t["texto"] for t in figura["textos"]]
-                        texto_completo = " ".join(textos).strip()
-                        if texto_completo:
-                            archivo.write(texto_completo + "\n")
-
-            print("[OK] Archivo 'salida.txt' generado correctamente.")
-
-        except Exception as e:
-            print(f"[ERROR] No se pudo crear el archivo: {e}")
-
+        self.mostrar_en_consola()  
 
 if __name__ == "__main__":
     root = tk.Tk()
