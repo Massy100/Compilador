@@ -1,12 +1,4 @@
-// Inicio del programa
-if {
-    print;
-    while {
-        if {
-            print;
-            for in range {
-            }
-        }
-    }
-}
-// Fin del programa
+#include <stdio.h>
+void main ( ) {
+int x = 1 ; }
+

@@ -493,148 +493,34 @@ class Parser:
         return NodoWhile(condicion, cuerpo_while)
     
 def seleccionar_archivo():
-    root = tk.Tk()
-    root.withdraw()  
+    print("[DEBUG] seleccionar_archivo() se ejecutó")
+    try:
+        with open("salida.txt", "r", encoding="utf-8") as f:
+            codigo_fuente = f.read()
+        return codigo_fuente  # Devuelve directamente el string
+    except Exception as e:
+        return f"Error al leer el archivo: {e}"  # Devuelve un string de error
     
-    # Configurar el dialogo para solo permitir archivos TXT
-    archivo = filedialog.askopenfilename(
-        title="Seleccionar archivo TXT",
-        filetypes=[("Archivos de texto", "*.txt"), ("Todos los archivos", "*.*")]
-    )
+def analizar_codigo():
+    try:
+        codigo_fuente = seleccionar_archivo()
+        if isinstance(codigo_fuente, str) and codigo_fuente.startswith("Error"):
+            return {"success": False, "message": codigo_fuente}
+        
+        tokens = identificar_tokens(codigo_fuente)
+        parser = Parser(tokens)
+        arbol_ast = parser.parsear()
+        
+        # Análisis semántico
+        analizador_semantico = AnalizadorSemantico()
+        analizador_semantico.analizar(arbol_ast)
+        
+        return {"success": True, "message": "Compilación exitosa", "ast": arbol_ast}
     
-    if archivo:
-        if not archivo.lower().endswith('.txt'):
-            print("Error: Solo se admite archivo con extension .txt")
-            return None
-        try:
-            with open(archivo, 'r', encoding='utf-8') as file:
-                codigo_fuente = file.read()
-            return codigo_fuente
-        except Exception as e:
-            print(f"Error al leer el archivo: {e}")
-            return None
-    else:
-        print("No se selecciono ningun archivo")
-        return None
-
-# === Codigo en Uso ===
-codigo_fuente = seleccionar_archivo()
-
-# Analisis lexico
-tokens = identificar_tokens(codigo_fuente)
-print("Tokens encontrados:")
-for tipo, valor in tokens:
-    print(f'{tipo}: {valor}')
-
-# Analisis Sintactico
-try:
-    print('\nIniciando analisis sintactico...')
-    parser = Parser(tokens)
-    arbol_ast = parser.parsear()
-    print('Analisis sintactico completado sin errores')
-
-except SyntaxError as e:
-    print(e)
-    
-def imprimir_ast(nodo):
-    if isinstance(nodo, NodoPrograma):
-        return {
-            "Programa": [imprimir_ast(f) for f in nodo.funciones] 
-        }
-    elif isinstance(nodo, NodoFuncion):
-        return {
-            "Funcion": nodo.nombre,
-            "Parametros": [imprimir_ast(p) for p in nodo.parametros],
-            "Cuerpo": [imprimir_ast(c) for c in nodo.cuerpo]
-        }
-    elif isinstance(nodo, NodoParametro):
-        return {
-            "Parametro": nodo.nombre,
-            "Tipo": nodo.tipo
-        }
-    elif isinstance(nodo, NodoAsignacion):
-        return {
-            "Asignacion": nodo.nombre,
-            "Expresion": imprimir_ast(nodo.expresion)
-        }
-    elif isinstance(nodo, NodoOperacion):
-        return {
-            "Operacion": nodo.operador,
-            "Izquierda": imprimir_ast(nodo.izquierda),
-            "Derecha": imprimir_ast(nodo.derecha)
-        }
-    elif isinstance(nodo, NodoRetorno):
-        return {
-            "Retorno": imprimir_ast(nodo.expresion)
-        }
-    elif isinstance(nodo, NodoIdentificador):
-        return {
-            "Identificador": nodo.nombre
-        }
-    elif isinstance(nodo, NodoNumero):
-        return {
-            "Numero": nodo.valor
-        }
-    elif isinstance(nodo, NodoLlamadaFuncion):
-        return {
-            "LlamadaFuncion": nodo.nombre,
-            "Argumentos": [imprimir_ast(arg) for arg in nodo.argumentos]
-        }
-    elif isinstance(nodo, NodoConstante):  # Nuevo caso para constantes
-        return {
-            "Constante": {
-                "Nombre": nodo.nombre,
-                "Tipo": nodo.tipo,
-                "Valor": nodo.valor[1] if isinstance(nodo.valor, tuple) else nodo.valor
-            }
-        }
-    elif isinstance(nodo, NodoWhile):
-        return {
-            "While": {
-                "Condicion": imprimir_ast(nodo.condicion),
-                "Cuerpo": [imprimir_ast(c) for c in nodo.cuerpo]
-            }
-        }
-    elif isinstance(nodo, NodoFor):
-        return {
-            "For": {
-                "Inicializacion": imprimir_ast(nodo.inicializacion),
-                "Condicion": imprimir_ast(nodo.condicion),
-                "Incremento": imprimir_ast(nodo.incremento),
-                "Cuerpo": [imprimir_ast(c) for c in nodo.cuerpo]
-            }
-        }
-    elif isinstance(nodo, NodoIf):
-        return {
-            "If": {
-                "Condicion": imprimir_ast(nodo.condicion),
-                "CuerpoIf": [imprimir_ast(c) for c in nodo.cuerpo_if],
-                "ElseIfs": [
-                    {
-                        "Condicion": imprimir_ast(cond),
-                        "Cuerpo": [imprimir_ast(c) for c in cuerpo]
-                    } for cond, cuerpo in nodo.else_ifs
-                ] if nodo.else_ifs else None,
-                "CuerpoElse": [imprimir_ast(c) for c in nodo.cuerpo_else] if nodo.cuerpo_else else None
-            }
-        }
-    elif isinstance(nodo, NodoIncremento):
-        return {
-            "Incremento": {
-                "Variable": nodo.variable,
-                "Tipo": nodo.tipo,
-                "Valor": imprimir_ast(nodo.valor) if nodo.valor else None
-            }
-        }
-    elif isinstance(nodo, NodoComparacion):
-        return {
-            "Comparacion": {
-                "Izquierda": imprimir_ast(nodo.izquierda),
-                "Operador": nodo.operador,
-                "Derecha": imprimir_ast(nodo.derecha)
-            }
-        }
-    return {}
+    except SyntaxError as e:
+        return {"success": False, "message": f"Error de sintaxis: {str(e)}"}
+    except Exception as e:
+        return {"success": False, "message": f"Error durante la compilación: {str(e)}"}
 
 def guardar_archivo(codigo_ensamblador, nombre_archivo="programa.s"):
     """
@@ -688,31 +574,150 @@ def guardar_archivo(codigo_ensamblador, nombre_archivo="programa.s"):
         print(f"Codigo ensamblador guardado en '{nombre_archivo}' (adaptado para MinGW)")
     except Exception as e:
         print(f"Error al guardar el archivo: {e}")
+        
+# # === Codigo en Uso ===
+# codigo_fuente = seleccionar_archivo()
 
-parser = Parser(tokens)
-arbol_ast = parser.parsear()    
-print(json.dumps(imprimir_ast(arbol_ast), indent=1))
+# # Analisis lexico
+# tokens = identificar_tokens(codigo_fuente)
+# print("Tokens encontrados:")
+# for tipo, valor in tokens:
+#     print(f'{tipo}: {valor}')
+
+# # Analisis Sintactico
+# try:
+#     print('\nIniciando analisis sintactico...')
+#     parser = Parser(tokens)
+#     arbol_ast = parser.parsear()
+#     print('Analisis sintactico completado sin errores')
+
+# except SyntaxError as e:
+#     print(e)
+    
+# def imprimir_ast(nodo):
+#     if isinstance(nodo, NodoPrograma):
+#         return {
+#             "Programa": [imprimir_ast(f) for f in nodo.funciones] 
+#         }
+#     elif isinstance(nodo, NodoFuncion):
+#         return {
+#             "Funcion": nodo.nombre,
+#             "Parametros": [imprimir_ast(p) for p in nodo.parametros],
+#             "Cuerpo": [imprimir_ast(c) for c in nodo.cuerpo]
+#         }
+#     elif isinstance(nodo, NodoParametro):
+#         return {
+#             "Parametro": nodo.nombre,
+#             "Tipo": nodo.tipo
+#         }
+#     elif isinstance(nodo, NodoAsignacion):
+#         return {
+#             "Asignacion": nodo.nombre,
+#             "Expresion": imprimir_ast(nodo.expresion)
+#         }
+#     elif isinstance(nodo, NodoOperacion):
+#         return {
+#             "Operacion": nodo.operador,
+#             "Izquierda": imprimir_ast(nodo.izquierda),
+#             "Derecha": imprimir_ast(nodo.derecha)
+#         }
+#     elif isinstance(nodo, NodoRetorno):
+#         return {
+#             "Retorno": imprimir_ast(nodo.expresion)
+#         }
+#     elif isinstance(nodo, NodoIdentificador):
+#         return {
+#             "Identificador": nodo.nombre
+#         }
+#     elif isinstance(nodo, NodoNumero):
+#         return {
+#             "Numero": nodo.valor
+#         }
+#     elif isinstance(nodo, NodoLlamadaFuncion):
+#         return {
+#             "LlamadaFuncion": nodo.nombre,
+#             "Argumentos": [imprimir_ast(arg) for arg in nodo.argumentos]
+#         }
+#     elif isinstance(nodo, NodoConstante):  # Nuevo caso para constantes
+#         return {
+#             "Constante": {
+#                 "Nombre": nodo.nombre,
+#                 "Tipo": nodo.tipo,
+#                 "Valor": nodo.valor[1] if isinstance(nodo.valor, tuple) else nodo.valor
+#             }
+#         }
+#     elif isinstance(nodo, NodoWhile):
+#         return {
+#             "While": {
+#                 "Condicion": imprimir_ast(nodo.condicion),
+#                 "Cuerpo": [imprimir_ast(c) for c in nodo.cuerpo]
+#             }
+#         }
+#     elif isinstance(nodo, NodoFor):
+#         return {
+#             "For": {
+#                 "Inicializacion": imprimir_ast(nodo.inicializacion),
+#                 "Condicion": imprimir_ast(nodo.condicion),
+#                 "Incremento": imprimir_ast(nodo.incremento),
+#                 "Cuerpo": [imprimir_ast(c) for c in nodo.cuerpo]
+#             }
+#         }
+#     elif isinstance(nodo, NodoIf):
+#         return {
+#             "If": {
+#                 "Condicion": imprimir_ast(nodo.condicion),
+#                 "CuerpoIf": [imprimir_ast(c) for c in nodo.cuerpo_if],
+#                 "ElseIfs": [
+#                     {
+#                         "Condicion": imprimir_ast(cond),
+#                         "Cuerpo": [imprimir_ast(c) for c in cuerpo]
+#                     } for cond, cuerpo in nodo.else_ifs
+#                 ] if nodo.else_ifs else None,
+#                 "CuerpoElse": [imprimir_ast(c) for c in nodo.cuerpo_else] if nodo.cuerpo_else else None
+#             }
+#         }
+#     elif isinstance(nodo, NodoIncremento):
+#         return {
+#             "Incremento": {
+#                 "Variable": nodo.variable,
+#                 "Tipo": nodo.tipo,
+#                 "Valor": imprimir_ast(nodo.valor) if nodo.valor else None
+#             }
+#         }
+#     elif isinstance(nodo, NodoComparacion):
+#         return {
+#             "Comparacion": {
+#                 "Izquierda": imprimir_ast(nodo.izquierda),
+#                 "Operador": nodo.operador,
+#                 "Derecha": imprimir_ast(nodo.derecha)
+#             }
+#         }
+#     return {}
+
+# parser = Parser(tokens)
+# arbol_ast = parser.parsear()    
+# print(json.dumps(imprimir_ast(arbol_ast), indent=1))
 
 
-# nodo_exp = NodoOperacion(NodoNumero(5), '+', NodoNumero(8))
-# print("Expresion original:", nodo_exp)
+# # nodo_exp = NodoOperacion(NodoNumero(5), '+', NodoNumero(8))
+# # print("Expresion original:", nodo_exp)
 
-# exp_opt = nodo_exp.optimizar()
-# print("Expresion optimizada:", exp_opt)
+# # exp_opt = nodo_exp.optimizar()
+# # print("Expresion optimizada:", exp_opt)
 
-# codigo_python = arbol_ast.traducir()
-# print(codigo_python)
+# # codigo_python = arbol_ast.traducir()
+# # print(codigo_python)
 
-codigo_asm = arbol_ast.generar_codigo()
-print(codigo_asm)
+# codigo_asm = arbol_ast.generar_codigo()
+# print(codigo_asm)
 
-print("Codigo ensamblador generado:\n", codigo_asm)
-guardar_archivo(codigo_asm)
+# print("Codigo ensamblador generado:\n", codigo_asm)
+# guardar_archivo(codigo_asm)
 
-analizador_semantico = AnalizadorSemantico()
-try:
-    analizador_semantico.analizar(arbol_ast)
-    print("\nTabla de simbolos:")
-    print(analizador_semantico.tabla_simbolos)
-except Exception as e:
-    print(f"\nError semantico: {e}")
+# analizador_semantico = AnalizadorSemantico()
+# try:
+#     analizador_semantico.analizar(arbol_ast)
+#     print("\nTabla de simbolos:")
+#     print(analizador_semantico.tabla_simbolos)
+# except Exception as e:
+#     print(f"\nError semantico: {e}")

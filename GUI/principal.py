@@ -4,8 +4,12 @@ from modo_texto import ModoTexto
 from modo_figura import ModoFigura
 from modo_conexion import ModoConexion
 import os
+import sys
 
+ruta_base = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(ruta_base)
 
+import analizador 
 
 class DiagramaFlujoApp:
     def __init__(self, root):
@@ -141,12 +145,6 @@ class DiagramaFlujoApp:
         controles_frame.place(relx=1.0, rely=0.0, anchor="ne", x=-9, y=10)
         
         ttk.Button(
-            controles_frame, 
-            text="Mostrar en Consola", 
-            command=self.mostrar_en_consola
-        ).pack(side="left", padx=5)
-        
-        ttk.Button(
             controles_frame,
             text="Limpiar Todo",
             command=self.limpiar_canvas
@@ -159,10 +157,69 @@ class DiagramaFlujoApp:
         ).pack(side="left", padx=5)
         
         ttk.Button(
-        controles_frame,
-        text="Generar salida.txt",
-        command=self.generar_archivo_salida
+            controles_frame, 
+            text="Generar salida txt", 
+            command=self.mostrar_en_consola
         ).pack(side="left", padx=5)
+        
+        ttk.Button(
+            controles_frame,
+            text="Compilar",
+            command=self.compilar_codigo
+        ).pack(side="left", padx=5)
+        
+    def compilar_codigo(self):
+        print("[DEBUG] compilar_codigo() se ejecutó")
+        resultado = analizador.analizar_codigo()  # Usa la nueva función
+
+        if resultado["success"]:
+            messagebox.showinfo("Compilación Exitosa", resultado["message"])
+        else:
+            self.mostrar_ventana_errores(resultado["message"])
+
+    def mostrar_ventana_errores(self, mensaje):
+        ventana_errores = tk.Toplevel(self.root)
+        ventana_errores.title("Errores de Compilación")
+        
+        # Frame principal con scroll
+        frame_principal = ttk.Frame(ventana_errores)
+        frame_principal.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Etiqueta de título
+        ttk.Label(
+            frame_principal, 
+            text="Errores encontrados:", 
+            font=("Arial", 12, "bold")
+        ).pack(pady=(0, 10))
+        
+        # Área de texto con scroll
+        frame_texto = ttk.Frame(frame_principal)
+        frame_texto.pack(fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(frame_texto)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        texto = tk.Text(
+            frame_texto,
+            wrap="word",
+            height=15,
+            width=80,
+            yscrollcommand=scrollbar.set,
+            font=("Consolas", 10)  # Fuente monoespaciada para mejor lectura
+        )
+        texto.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=texto.yview)
+        
+        # Insertar mensaje de error
+        texto.insert("1.0", mensaje)
+        texto.config(state="disabled")
+        
+        # Botón de cerrar
+        ttk.Button(
+            frame_principal,
+            text="Cerrar",
+            command=ventana_errores.destroy
+        ).pack(pady=(10, 0))
 
     
     def manejar_clic(self, event):
@@ -272,7 +329,7 @@ class DiagramaFlujoApp:
         finales = []
         bucles = {}  # {id_figura: tipo_bucle}
         decisiones = []
-        
+        archivo.write("#include <stdio.h>")
         for figura in self.figuras:
             textos = [t["texto"] for t in figura["textos"]]
             texto_completo = " ".join(textos)
@@ -322,14 +379,14 @@ class DiagramaFlujoApp:
             
             # Escribir el código según el tipo de figura
             if texto_completo.startswith("INICIO"):
-                archivo.write("// Inicio del programa\n")
+                archivo.write("\n")
             elif texto_completo.startswith("FIN"):
                 # Cerramos todos los bloques abiertos antes del FIN
                 while bloques_abiertos:
                     indentacion -= 4
                     archivo.write(" " * indentacion + "}\n")
                     bloques_abiertos.pop()
-                archivo.write("// Fin del programa\n")
+                archivo.write("\n")
             elif current in bucles:
                 tipo_bucle = bucles[current]
                 archivo.write(" " * indentacion + f"{texto_completo} {{\n")
@@ -342,7 +399,7 @@ class DiagramaFlujoApp:
             else:
                 # Comandos normales
                 if texto_completo:
-                    archivo.write(" " * indentacion + f"{texto_completo};\n")
+                    archivo.write(" " * indentacion + f"{texto_completo}\n")
             
             # Manejo de conexiones
             conexiones = [c for c in self.conexiones if c["origen"] == current]
@@ -513,9 +570,6 @@ class DiagramaFlujoApp:
                 if t["id"] == texto_info["id"]:
                     t["fuente"] = tamaño_fuente
                     break
-
-    def generar_archivo_salida(self):
-        self.mostrar_en_consola()  
 
 if __name__ == "__main__":
     root = tk.Tk()

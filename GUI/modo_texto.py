@@ -6,9 +6,9 @@ class ModoTexto:
         self.app = app
         self.categorias = {
             "Palabra Clave": ["if", "else", "return", "while", "for", "in", "range",
-                            "print", "break", "int", "float", "void", 
+                            "printf", "break", "int", "float", "void", 
                             "double", "char", "const", "true", "false"],
-            "Operador": ["+", "-", "*", "/", "=", "<", ">", "!", "_"],
+            "Operador": ["+", "-", "*", "/", "=", "<", ">", "!", "_", '"'],
             "Delimitadores": ["(", ")", ",", ";", "{", "}"],
             "Terminal": ["INICIO", "FIN"]
         }
