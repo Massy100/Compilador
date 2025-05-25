@@ -21,24 +21,13 @@
         global _calcular_circunferencia ; Funcion flotante
         global _main          ; Hace visible la funcion 'main' (con _ para MinGW)
 
-    hola:
-    push ebp
-    mov ebp, esp
-    mov eax, " Hola Massy " ; cargar string
-    push eax
-    call _printf
-    add esp, 4
-    mov esp, ebp
-    pop ebp
-    ret
+    #include <stdio.h>
 
+void hola() {
+    printf("Hola");
+}
 
-_main:
-    push ebp
-    mov ebp, esp
-
-    mov esp, ebp
-    pop ebp
-    ret
-
+int main() {
+    hola();
+}
 

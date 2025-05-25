@@ -514,6 +514,7 @@ def analizar_codigo():
         # Análisis semántico
         analizador_semantico = AnalizadorSemantico()
         analizador_semantico.analizar(arbol_ast)
+        guardar_archivo(codigo_fuente)
         
         return {"success": True, "message": "Compilación exitosa", "ast": arbol_ast}
     
