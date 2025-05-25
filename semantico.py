@@ -3,8 +3,13 @@ from GUI.nodos import *
 class AnalizadorSemantico:
     def __init__(self):
         self.tabla_simbolos = TablaSimbolos()
-        self.funcion_actual = None  # Para rastrear la funcion actual
-        self.tipo_retorno_actual = None  # Para validar returns
+        self.funcion_actual = None
+        self.tipo_retorno_actual = None
+        # Agregamos funciones de biblioteca conocidas con sus firmas
+        self.funciones_biblioteca = {
+            'printf': ('int', ['const char*', '...']),  # printf devuelve int y acepta string + args variables
+            'scanf': ('int', ['const char*', '...'])    # scanf tiene firma similar
+        }
         
     def analizar(self, nodo):
         if isinstance(nodo, NodoPrograma):
@@ -70,20 +75,36 @@ class AnalizadorSemantico:
             return tipo_izq
             
         elif isinstance(nodo, NodoLlamadaFuncion):
-            # Verificar que la funcion exista
-            tipo_retorno, tipos_parametros = self.tabla_simbolos.obtener_info_funcion(nodo.nombre)
-            
-            # Verificar numero de argumentos
-            if len(nodo.argumentos) != len(tipos_parametros):
-                raise Exception(f"Error semantico: la funcion '{nodo.nombre}' espera {len(tipos_parametros)} argumentos pero se proporcionaron {len(nodo.argumentos)}")
-            
-            # Verificar tipos de argumentos
-            for i, (arg, tipo_esperado) in enumerate(zip(nodo.argumentos, tipos_parametros)):
-                tipo_arg = self.analizar(arg)
-                if tipo_arg != tipo_esperado:
-                    raise Exception(f"Error semantico: en argumento {i+1} de '{nodo.nombre}'. Se esperaba {tipo_esperado} pero se obtuvo {tipo_arg}")
-            
-            return tipo_retorno
+            # Verificar si es una función de biblioteca
+            if nodo.nombre in self.funciones_biblioteca:
+                tipo_retorno, tipos_parametros = self.funciones_biblioteca[nodo.nombre]
+                # Para printf/scanf no verificamos estrictamente los parámetros debido a los ...
+                if nodo.nombre in ['printf', 'scanf']:
+                    return tipo_retorno
+                
+                # Verificación normal para otras funciones de biblioteca
+                if len(nodo.argumentos) != len(tipos_parametros):
+                    raise Exception(f"Error semantico: la funcion '{nodo.nombre}' espera {len(tipos_parametros)} argumentos pero se proporcionaron {len(nodo.argumentos)}")
+                
+                for i, (arg, tipo_esperado) in enumerate(zip(nodo.argumentos, tipos_parametros)):
+                    tipo_arg = self.analizar(arg)
+                    if tipo_arg != tipo_esperado:
+                        raise Exception(f"Error semantico: en argumento {i+1} de '{nodo.nombre}'. Se esperaba {tipo_esperado} pero se obtuvo {tipo_arg}")
+                
+                return tipo_retorno
+            else:
+                # Verificación normal para funciones definidas por el usuario
+                tipo_retorno, tipos_parametros = self.tabla_simbolos.obtener_info_funcion(nodo.nombre)
+                
+                if len(nodo.argumentos) != len(tipos_parametros):
+                    raise Exception(f"Error semantico: la funcion '{nodo.nombre}' espera {len(tipos_parametros)} argumentos pero se proporcionaron {len(nodo.argumentos)}")
+                
+                for i, (arg, tipo_esperado) in enumerate(zip(nodo.argumentos, tipos_parametros)):
+                    tipo_arg = self.analizar(arg)
+                    if tipo_arg != tipo_esperado:
+                        raise Exception(f"Error semantico: en argumento {i+1} de '{nodo.nombre}'. Se esperaba {tipo_esperado} pero se obtuvo {tipo_arg}")
+                
+                return tipo_retorno
             
         elif isinstance(nodo, NodoRetorno):
             tipo_retorno = self.analizar(nodo.expresion)
@@ -156,6 +177,10 @@ class TablaSimbolos:
         self.funciones[nombre] = (tipo_retorno, parametros)
         
     def obtener_info_funcion(self, nombre):
+        # Primero verificar si es una función de biblioteca
+        if nombre in ['printf', 'scanf']:
+            return ('int', ['const char*', '...'])
+        
         if nombre not in self.funciones:
             raise Exception(f'Error semantico: la funcion {nombre} no esta declarada')
         return self.funciones[nombre]
